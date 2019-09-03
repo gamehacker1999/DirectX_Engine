@@ -1,0 +1,4 @@
+﻿  Mesh.cpp
+C:\Users\Shubham Sachdeva\Desktop\DX11Starter\Mesh.cpp(84,41): warning C4267:  '=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\Shubham Sachdeva\Desktop\DX11Starter\Mesh.cpp(128,52): warning C4267:  '=': conversion from 'size_t' to 'int', possible loss of data
+  DX11Starter.vcxproj -> C:\Users\Shubham Sachdeva\Desktop\DX11Starter\x64\Debug\DX11Starter.exe
