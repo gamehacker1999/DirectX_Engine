@@ -86,6 +86,11 @@ std::shared_ptr<Mesh> Entity::GetMesh()
 	return mesh;
 }
 
+std::shared_ptr<Material> Entity::GetMaterial()
+{
+	return material;
+}
+
 void Entity::PrepareMaterial(XMFLOAT4X4 view, XMFLOAT4X4 projection)
 {
 	//setting the appropriate data for the shader

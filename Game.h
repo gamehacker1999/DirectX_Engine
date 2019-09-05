@@ -7,6 +7,7 @@
 #include"Entity.h"
 #include<vector>
 #include"Camera.h"
+#include"Lights.h"
 class Game 
 	: public DXCore
 {
@@ -57,5 +58,9 @@ private:
 
 	//camera
 	std::shared_ptr<Camera> camera;
+
+	//creating a directional light
+	DirectionalLight directionalLight;
+	DirectionalLight directionalLight2;
 };
 

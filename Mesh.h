@@ -6,7 +6,9 @@
 #include<string>
 #include<vector>
 #include<fstream>
+#include<DirectXMath.h>
 
+using namespace DirectX;
 //class to hold the index and vertex data for basic geometry
 class Mesh
 {
@@ -20,7 +22,9 @@ public:
 
 	//constructor and destructor
 	Mesh(Vertex* vertices, unsigned int numVertices, unsigned int* indices, int numIndices, ID3D11Device* device);
-	Mesh(std::string fileName,ID3D11Device* device);
+	Mesh(std::string fileName, ID3D11Device* device);
+	void CalculateTangents(std::vector<Vertex>& vertices, std::vector<XMFLOAT3>& position, std::vector<XMFLOAT3>& normals,
+		std::vector<XMFLOAT2>& uvs, std::vector<XMFLOAT3>& tangents, std::vector<XMFLOAT3>& bitangents, unsigned int vertCount);
 	~Mesh();
 
 	ID3D11Buffer* GetVertexBuffer();

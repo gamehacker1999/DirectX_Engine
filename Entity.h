@@ -42,6 +42,8 @@ public:
 
 	std::shared_ptr<Mesh> GetMesh();
 
+	std::shared_ptr<Material> GetMaterial();
+
 	//method that prepares the material and sends it to the gpu
 	void PrepareMaterial(XMFLOAT4X4 view, XMFLOAT4X4 projection);
 };

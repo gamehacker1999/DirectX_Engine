@@ -36,6 +36,9 @@ public:
 	//changing the x and y of the mouse to rotate the camera
 	void ChangeYawAndPitch(float deltaX, float deltaY);
 
+	//getters
+	XMFLOAT3 GetPosition();
+
 	//method to update the camera
 	void Update(float deltaTime);
 };

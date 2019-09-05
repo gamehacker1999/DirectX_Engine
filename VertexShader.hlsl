@@ -27,7 +27,8 @@ struct VertexShaderInput
 	float3 position		: POSITION;     // XYZ position
 	//float4 color		: COLOR;        // RGBA color
 	float3 normal		: NORMAL;		//Normal of the vertex
-	float2 uv			: UV;			//Texture coordinates
+	float3 tangent		: TANGENT;      //tangent of the vertex
+	float2 uv			: TEXCOORD;		//Texture coordinates
 };
 
 // Struct representing the data we're sending down the pipeline
@@ -44,6 +45,10 @@ struct VertexToPixel
 	//  v    v                v
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
 	//float4 color		: COLOR;        // RGBA color
+	float3 normal		: NORMAL;		//normal of the vertex
+	float3 worldPosition: POSITION; //position of vertex in world space
+	float3 tangent		: TANGENT;	//tangent of the vertex
+	float2 uv			: TEXCOORD;
 };
 
 // --------------------------------------------------------
@@ -73,6 +78,18 @@ VertexToPixel main( VertexShaderInput input )
 	// The result is essentially the position (XY) of the vertex on our 2D 
 	// screen and the distance (Z) from the camera (the "depth" of the pixel)
 	output.position = mul(float4(input.position, 1.0f), worldViewProj);
+
+	//applying the normal by removing the translation from it
+	output.normal = mul(input.normal, (float3x3)world);
+
+	//sending the world position of the vertex to the fragment shader
+	output.worldPosition = mul(float4(input.position,1.0f),world).xyz;
+
+	//sending the world coordinates of the tangent to the pixel shader
+	output.tangent = mul(input.tangent, (float3x3)world);
+
+	//sending the UV coordinates
+	output.uv = input.uv;
 
 	// Pass the color through 
 	// - The values will be interpolated per-pixel by the rasterizer

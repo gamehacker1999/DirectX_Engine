@@ -65,6 +65,15 @@ void Game::Init()
 
 	camera->CreateProjectionMatrix((float)width / height); //creating the camera projection matrix
 
+	//specifying the directional light
+	directionalLight.ambientColor = XMFLOAT4(0.1f, 0.1f ,0.1f, 1.0f);
+	directionalLight.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	directionalLight.direction = XMFLOAT3(1.0f, -1.0f, 0.0f);
+
+	//second light
+	directionalLight2.ambientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
+	directionalLight2.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	directionalLight2.direction = XMFLOAT3(-1.0f, -1.0f, 1.0f);
 
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
@@ -137,78 +146,33 @@ void Game::CreateMatrices()
 // --------------------------------------------------------
 void Game::CreateBasicGeometry()
 {
-	// Create some temporary variables to represent colors
-	// - Not necessary, just makes things more readable
-	XMFLOAT4 red = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
-	XMFLOAT4 green = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-	XMFLOAT4 blue = XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f);
-
-	// Set up the vertices of the triangle we would like to draw
-	// - We're going to copy this array, exactly as it exists in memory
-	//    over to a DirectX-controlled data structure (the vertex buffer)
-	Vertex verticesMesh1[] =
-	{
-		{ XMFLOAT3(+0.0f, +1.0f, +0.0f), XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{ XMFLOAT3(+1.5f, -1.0f, +0.0f), XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{ XMFLOAT3(-1.5f, -1.0f, +0.0f), XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f) },
-	};
-
-	// Set up the indices, which tell us which vertices to use and in which order
-	// - This is somewhat redundant for just 3 vertices (it's a simple example)
-	// - Indices are technically not required if the vertices are in the buffer 
-	//    in the correct order and each one will be used exactly once
-	// - But just to see how it's done...
-	unsigned int indicesMesh1[] = { 0, 1, 2 };
-
-	mesh1 = std::make_shared<Mesh>(verticesMesh1, 3, indicesMesh1, 3, device);
-
-	//vertices and indices for mesh 2
-	Vertex verticesMesh2[] = 
-	{
-		{XMFLOAT3(1.8f,1.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(2.8f,1.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(2.8f,-1.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(1.8f,-1.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)}
-	};
-
-	unsigned int indicesMesh2[] = 
-	{ 
-		3,1,2,
-		3,0,1 
-	};
-
-	//creating the mesh data for the second mesh
-	mesh2 = std::make_shared<Mesh>(verticesMesh2, 4, indicesMesh2, 6, device);
-
-	//setting the vertex and index buffer for the third mesh
-	Vertex verticesMesh3[] =
-	{
-		{XMFLOAT3(-2.3f,1.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(-1.8f,0.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(-1.8f,-1.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(-2.8f,-1.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(-2.8f,0.0f,0.0f),XMFLOAT3(0.0f,0.0f,-1.0f),XMFLOAT2(0.0f,0.0f)}
-	};
-
-	unsigned int indicesMesh3[] =
-	{
-		0,1,4,
-		1,2,4,
-		2,3,4
-	};
-
-	//setting the data for the third mesh
-	mesh3 = std::make_shared<Mesh>(verticesMesh3, 5, indicesMesh3, 9,device);
 
 	//adding three entities with the meshes
 	entities.reserve(100);
 
-	//creating a material for these entities
-	std::shared_ptr<Material> material = std::make_shared<Material>(vertexShader, pixelShader);
+	ID3D11ShaderResourceView* textureSRV;
+	//trying to load a texture
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/Brick.jpg",0,&textureSRV);
 
-	//entities.emplace_back(std::make_shared<Entity>(mesh1,material));
-	//entities.emplace_back(std::make_shared<Entity>(mesh1,material)); //this entity is sharing a mesh with the previous one
-	//entities.emplace_back(std::make_shared<Entity>(mesh3,material));
+	//trying to load a normalMap
+	ID3D11ShaderResourceView* normalTextureSRV;
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/BrickNormal.jpg", 0, &normalTextureSRV);
+
+	//creating a sampler state
+	ID3D11SamplerState* samplerState;
+	//sampler state description
+	D3D11_SAMPLER_DESC samplerDesc;
+	memset(&samplerDesc, 0, sizeof(samplerDesc));
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+	device->CreateSamplerState(&samplerDesc, &samplerState); //creating the sampler state
+	
+	//creating a material for these entities
+	std::shared_ptr<Material> material = std::make_shared<Material>(vertexShader, pixelShader,samplerState,textureSRV, normalTextureSRV);
 
 	std::shared_ptr<Mesh> cube = std::make_shared<Mesh>("../../Assets/Models/sphere.obj",device);
 
@@ -246,31 +210,6 @@ void Game::Update(float deltaTime, float totalTime)
 	if (GetAsyncKeyState(VK_ESCAPE))
 		Quit();
 
-	//moving the first entity
-	auto pos = entities[0]->GetPosition();
-	pos.x += 0.1f * deltaTime;
-	entities[0]->SetPosition(pos);
-
-	//making the second entity move in a sine wave
-	pos = entities[1]->GetPosition();
-	pos.x -= 0.1f * deltaTime;
-	float yPos = sin(pos.x);
-	pos.y = yPos;
-	entities[1]->SetPosition(pos);
-
-	//rotating the third entity
-	auto q1 = XMLoadFloat4(&entities[2]->GetRotation());
-
-	//XMFLOAT4 newRotation=rotation; 
-	static float rotAngle = 0.001f;
-
-	XMFLOAT3 axis(0.0f, 0.0f, 1.0f*deltaTime);
-	auto q2 = XMQuaternionRotationAxis(XMLoadFloat3(&axis), rotAngle); //new orientation for the entity
-	XMFLOAT4 finalRotation;
-
-	XMStoreFloat4(&finalRotation,XMQuaternionMultiply(q1, q2));//getting the final rotation
-	entities[2]->SetRotation(finalRotation); //setting the final rotation
-
 	//updating the camera
 	camera->Update(deltaTime);
 }
@@ -293,41 +232,31 @@ void Game::Draw(float deltaTime, float totalTime)
 		1.0f,
 		0);
 
-	// Send data to shader variables
-	//  - Do this ONCE PER OBJECT you're drawing
-	//  - This is actually a complex process of copying data to a local buffer
-	//    and then copying that entire buffer to the GPU.  
-	//  - The "SimpleShader" class handles all of that for you.
-	/*vertexShader->SetMatrix4x4("world", worldMatrix);
-	vertexShader->SetMatrix4x4("view", camera->GetViewMatrix());
-	vertexShader->SetMatrix4x4("projection", camera->GetProjectionMatrix());*/
-
-	// Once you've set all of the data you care to change for
-	// the next draw call, you need to actually send it to the GPU
-	//  - If you skip this, the "SetMatrix" calls above won't make it to the GPU!
-	//vertexShader->CopyAllBufferData();
-
-	// Set the vertex and pixel shaders to use for the next Draw() command
-	//  - These don't technically need to be set every frame...YET
-	//  - Once you start applying different shaders to different objects,
-	//    you'll need to swap the current shaders before each draw
-	/*vertexShader->SetShader();
-	pixelShader->SetShader();*/
-
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
 
 	//looping through the entities to draw them
 	for (size_t i = 0; i < entities.size(); i++)
 	{
-		//setting the model matrix of the entity
-		/*vertexShader->SetMatrix4x4("world", entities[i]->GetModelMatrix());
-		vertexShader->CopyAllBufferData();*/
-		//setting the vertex and index buffer
+		//preparing material for entity
 		entities[i]->PrepareMaterial(camera->GetViewMatrix(), camera->GetProjectionMatrix());
+
+		//adding lights and sending camera position
+		pixelShader->SetData("light", &directionalLight, sizeof(DirectionalLight)); //adding directional lights to the scene
+		pixelShader->SetData("light2", &directionalLight2, sizeof(DirectionalLight));
+		pixelShader->SetFloat3("cameraPosition",camera->GetPosition());
+
+		//setting the sampler state and textures
+		pixelShader->SetSamplerState("basicSampler", entities[i]->GetMaterial()->GetSamplerState());
+		pixelShader->SetShaderResourceView("diffuseTexture", entities[i]->GetMaterial()->GetTextureSRV());
+		pixelShader->SetShaderResourceView("normalMap", entities[i]->GetMaterial()->GetNormalTextureSRV());
+		pixelShader->CopyAllBufferData();
+
+		//setting the vertex and index buffer
 		auto tempVertexBuffer = entities[i]->GetMesh()->GetVertexBuffer();
 		context->IASetVertexBuffers(0, 1, &tempVertexBuffer, &stride, &offset);
 		context->IASetIndexBuffer(entities[i]->GetMesh()->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+
 		//drawing the entity
 		context->DrawIndexed(entities[i]->GetMesh()->GetIndexCount(), 0, 0);
 	}

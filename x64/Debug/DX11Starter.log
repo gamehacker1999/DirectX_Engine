@@ -1,4 +1,17 @@
-﻿  Mesh.cpp
-C:\Users\Shubham Sachdeva\Desktop\DX11Starter\Mesh.cpp(84,41): warning C4267:  '=': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\Shubham Sachdeva\Desktop\DX11Starter\Mesh.cpp(128,52): warning C4267:  '=': conversion from 'size_t' to 'int', possible loss of data
+﻿  compilation object save succeeded; see C:\Users\Shubham Sachdeva\Desktop\DX11Starter\x64\Debug\PixelShader.cso
+  compilation object save succeeded; see C:\Users\Shubham Sachdeva\Desktop\DX11Starter\x64\Debug\SkyboxPS.cso
+  compilation object save succeeded; see C:\Users\Shubham Sachdeva\Desktop\DX11Starter\x64\Debug\SkyboxVS.cso
+  compilation object save succeeded; see C:\Users\Shubham Sachdeva\Desktop\DX11Starter\x64\Debug\VertexShader.cso
+  Camera.cpp
+  DXCore.cpp
+  Entity.cpp
+  Game.cpp
+  Lights.cpp
+  Main.cpp
+  Material.cpp
+  Mesh.cpp
+  SimpleShader.cpp
+  Skybox.cpp
+  Textures.cpp
+  Generating Code...
   DX11Starter.vcxproj -> C:\Users\Shubham Sachdeva\Desktop\DX11Starter\x64\Debug\DX11Starter.exe
