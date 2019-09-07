@@ -24,7 +24,7 @@ Game::Game(HINSTANCE hInstance)
 	vertexShader = 0;
 	pixelShader = 0;
 
-	prevMousePos = { 0,0 };
+	prevMousePos = { 0,0 };	
 
 #if defined(DEBUG) || defined(_DEBUG)
 	// Do we want a console window?  Probably only in debug mode
@@ -45,6 +45,10 @@ Game::~Game()
 	// will clean up their own internal DirectX stuff
 	delete vertexShader;
 	delete pixelShader;
+
+	//releasing depth stencil
+	dssLessEqual->Release();
+
 }
 
 // --------------------------------------------------------
@@ -66,7 +70,7 @@ void Game::Init()
 	camera->CreateProjectionMatrix((float)width / height); //creating the camera projection matrix
 
 	//specifying the directional light
-	directionalLight.ambientColor = XMFLOAT4(0.1f, 0.1f ,0.1f, 1.0f);
+	directionalLight.ambientColor = XMFLOAT4(0.1f, 0.1f ,0.1f,1.f);
 	directionalLight.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	directionalLight.direction = XMFLOAT3(1.0f, -1.0f, 0.0f);
 
@@ -74,6 +78,17 @@ void Game::Init()
 	directionalLight2.ambientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
 	directionalLight2.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	directionalLight2.direction = XMFLOAT3(-1.0f, -1.0f, 1.0f);
+
+	//setting depth stencil for skybox;
+		//depth stencil state for skybox
+	D3D11_DEPTH_STENCIL_DESC dssDesc;
+	memset(&dssDesc, 0, sizeof(dssDesc));
+	dssDesc.DepthEnable = true;
+	dssDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	dssDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+
+	device->CreateDepthStencilState(&dssDesc, &dssLessEqual);
+
 
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
@@ -93,7 +108,7 @@ void Game::LoadShaders()
 	vertexShader->LoadShaderFile(L"VertexShader.cso");
 
 	pixelShader = new SimplePixelShader(device, context);
-	pixelShader->LoadShaderFile(L"PixelShader.cso");
+	pixelShader->LoadShaderFile(L"PBRPixelShader.cso");
 }
 
 
@@ -152,11 +167,17 @@ void Game::CreateBasicGeometry()
 
 	ID3D11ShaderResourceView* textureSRV;
 	//trying to load a texture
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/Brick.jpg",0,&textureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredDiffuse.png",0,&textureSRV);
 
 	//trying to load a normalMap
 	ID3D11ShaderResourceView* normalTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/BrickNormal.jpg", 0, &normalTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredNormal.png", 0, &normalTextureSRV);
+
+	ID3D11ShaderResourceView* roughnessTextureSRV;
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredRoughness.png", 0, &roughnessTextureSRV);
+
+	ID3D11ShaderResourceView* metalnessTextureSRV;
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredMetal.png", 0, &metalnessTextureSRV);
 
 	//creating a sampler state
 	ID3D11SamplerState* samplerState;
@@ -172,11 +193,30 @@ void Game::CreateBasicGeometry()
 	device->CreateSamplerState(&samplerDesc, &samplerState); //creating the sampler state
 	
 	//creating a material for these entities
-	std::shared_ptr<Material> material = std::make_shared<Material>(vertexShader, pixelShader,samplerState,textureSRV, normalTextureSRV);
+	std::shared_ptr<Material> material = std::make_shared<Material>(vertexShader, pixelShader,samplerState,
+		textureSRV, normalTextureSRV,roughnessTextureSRV,metalnessTextureSRV);
 
 	std::shared_ptr<Mesh> cube = std::make_shared<Mesh>("../../Assets/Models/sphere.obj",device);
 
 	entities.emplace_back(std::make_shared<Entity>(cube, material));
+	//entities[0]->SetScale(XMFLOAT3(2.f, 2.f, 2.f));
+
+	ID3D11SamplerState* samplerStateCube;
+	//sampler state description
+	memset(&samplerDesc, 0, sizeof(samplerDesc));
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+	device->CreateSamplerState(&samplerDesc, &samplerStateCube); //creating the sampler state
+
+
+	skybox = std::make_shared<Skybox>();
+	//creating skybox
+	skybox->LoadSkybox(L"../../Assets/Textures/cubemap.dds", device, context,samplerStateCube);
+
 }
 
 
@@ -190,7 +230,7 @@ void Game::OnResize()
 	DXCore::OnResize();
 
 	//updating the camera projection matrix
-	camera->CreateProjectionMatrix(float(width / height));
+	camera->CreateProjectionMatrix((float)width / height);
 
 	// Update our projection matrix since the window size changed
 	XMMATRIX P = XMMatrixPerspectiveFovLH(
@@ -250,6 +290,8 @@ void Game::Draw(float deltaTime, float totalTime)
 		pixelShader->SetSamplerState("basicSampler", entities[i]->GetMaterial()->GetSamplerState());
 		pixelShader->SetShaderResourceView("diffuseTexture", entities[i]->GetMaterial()->GetTextureSRV());
 		pixelShader->SetShaderResourceView("normalMap", entities[i]->GetMaterial()->GetNormalTextureSRV());
+		pixelShader->SetShaderResourceView("roughnessMap", entities[i]->GetMaterial()->GetRoughnessSRV());
+		pixelShader->SetShaderResourceView("metalnessMap", entities[i]->GetMaterial()->GetMetalnessSRV());
 		pixelShader->CopyAllBufferData();
 
 		//setting the vertex and index buffer
@@ -260,6 +302,19 @@ void Game::Draw(float deltaTime, float totalTime)
 		//drawing the entity
 		context->DrawIndexed(entities[i]->GetMesh()->GetIndexCount(), 0, 0);
 	}
+
+	context->OMSetDepthStencilState(dssLessEqual, 0);
+
+	//draw the skybox
+	skybox->PrepareSkybox(camera->GetViewMatrix(), camera->GetProjectionMatrix(), camera->GetPosition());
+	auto tempVertexBuffer = skybox->GetVertexBuffer();
+	auto skyboxStride = skybox->GetStride();
+	context->IASetVertexBuffers(0, 1, &tempVertexBuffer, &stride, &offset);
+	context->IASetIndexBuffer(skybox->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+
+	context->DrawIndexed(skybox->GetIndexCount(), 0, 0);
+
+	context->OMSetDepthStencilState(NULL, 0);
 
 	// Present the back buffer to the user
 	//  - Puts the final frame we're drawing into the window so the user can see it

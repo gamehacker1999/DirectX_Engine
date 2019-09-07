@@ -15,10 +15,15 @@ Material::~Material()
 		samplerState->Release();
 	if (normalTextureSRV)
 		normalTextureSRV->Release();
+	if (roughnessTextureSRV)
+		roughnessTextureSRV->Release();
+	if (metalnessTextureSRV)
+		metalnessTextureSRV->Release();
 }
 
 Material::Material(SimpleVertexShader* vertexShader, SimplePixelShader* pixelShader, 
-	ID3D11SamplerState* samplerState, ID3D11ShaderResourceView* textureSRV,ID3D11ShaderResourceView* normalTextureSRV)
+	ID3D11SamplerState* samplerState, ID3D11ShaderResourceView* textureSRV,ID3D11ShaderResourceView* normalTextureSRV,
+	ID3D11ShaderResourceView* roughnessTextureSRV, ID3D11ShaderResourceView* metalnessTextureSRV)
 {
 	//setting the shaders
 	this->pixelShader = pixelShader;
@@ -29,6 +34,15 @@ Material::Material(SimpleVertexShader* vertexShader, SimplePixelShader* pixelSha
 	this->samplerState = samplerState;
 
 	this->normalTextureSRV = normalTextureSRV;
+	this->roughnessTextureSRV = roughnessTextureSRV;
+	this->metalnessTextureSRV = metalnessTextureSRV;
+}
+
+Material::Material(SimpleVertexShader* vertexShader, SimplePixelShader* pixelShader, std::shared_ptr<Textures> textures)
+{
+	this->vertexShader = vertexShader;
+	this->pixelShader = pixelShader;
+	this->textures = textures;
 }
 
 SimplePixelShader* Material::GetPixelShader()
@@ -54,4 +68,14 @@ ID3D11ShaderResourceView* Material::GetTextureSRV()
 ID3D11ShaderResourceView* Material::GetNormalTextureSRV()
 {
 	return normalTextureSRV;
+}
+
+ID3D11ShaderResourceView* Material::GetRoughnessSRV()
+{
+	return roughnessTextureSRV;
+}
+
+ID3D11ShaderResourceView* Material::GetMetalnessSRV()
+{
+	return metalnessTextureSRV;
 }

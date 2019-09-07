@@ -8,6 +8,7 @@
 #include<vector>
 #include"Camera.h"
 #include"Lights.h"
+#include"Skybox.h"
 class Game 
 	: public DXCore
 {
@@ -62,5 +63,15 @@ private:
 	//creating a directional light
 	DirectionalLight directionalLight;
 	DirectionalLight directionalLight2;
+
+	//creating a skybox and it's shaders
+	SimpleVertexShader* skyboxVS;
+	SimplePixelShader* skyboxPS;
+	std::shared_ptr<Skybox> skybox;
+
+	//depth stencil for skybox
+	ID3D11DepthStencilState* dssLessEqual;
+
+
 };
 

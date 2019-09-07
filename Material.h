@@ -3,6 +3,7 @@
 #include"SimpleShader.h"
 #include<DirectXMath.h>
 #include<memory>
+#include"Textures.h"
 #include<WICTextureLoader.h>
 using namespace DirectX;
 class Material
@@ -15,6 +16,11 @@ class Material
 	ID3D11SamplerState* samplerState;
 	ID3D11ShaderResourceView* textureSRV;
 	ID3D11ShaderResourceView* normalTextureSRV;
+	ID3D11ShaderResourceView* roughnessTextureSRV;
+	ID3D11ShaderResourceView* metalnessTextureSRV;
+
+	//textures in this material
+	std::shared_ptr<Textures> textures;
 
 public:
 	//constructor
@@ -24,7 +30,11 @@ public:
 
 	//material for loading textures
 	Material(SimpleVertexShader* vertexShader, SimplePixelShader* pixelShader,
-		ID3D11SamplerState* samplerState, ID3D11ShaderResourceView* textureSRV,ID3D11ShaderResourceView* normalTextureSRV=nullptr);
+		ID3D11SamplerState* samplerState, ID3D11ShaderResourceView* textureSRV,
+		ID3D11ShaderResourceView* normalTextureSRV=nullptr, ID3D11ShaderResourceView* roughnessTextureSRV = nullptr,
+		ID3D11ShaderResourceView* metalnessTextureSRV = nullptr);
+
+	Material(SimpleVertexShader* vertexShader, SimplePixelShader* pixelShader, std::shared_ptr<Textures> textures);
 
 	//getters for shaders and textures
 	SimplePixelShader* GetPixelShader();
@@ -33,5 +43,7 @@ public:
 	ID3D11SamplerState* GetSamplerState();
 	ID3D11ShaderResourceView* GetTextureSRV();
 	ID3D11ShaderResourceView* GetNormalTextureSRV();
+	ID3D11ShaderResourceView* GetRoughnessSRV();
+	ID3D11ShaderResourceView* GetMetalnessSRV();
 };
 

@@ -206,6 +206,8 @@ Mesh::Mesh(std::string fileName, ID3D11Device* device)
 
 		}
 
+		CalculateTangents(vertices, positions, uvs, vertCount);
+
 		numIndices = vertCount;
 
 		//create the vertex and index buffer
@@ -238,8 +240,8 @@ Mesh::Mesh(std::string fileName, ID3D11Device* device)
 	}
 }
 
-void Mesh::CalculateTangents(std::vector<Vertex>& vertices, std::vector<XMFLOAT3>& position, std::vector<XMFLOAT3>& normals,
-	std::vector<XMFLOAT2>& uvs, std::vector<XMFLOAT3>& tangents, std::vector<XMFLOAT3>& bitangents, unsigned int vertCount)
+void Mesh::CalculateTangents(std::vector<Vertex>& vertices, std::vector<XMFLOAT3>& position,
+	std::vector<XMFLOAT2>& uvs,unsigned int vertCount)
 {
 	//compute the tangents and bitangents for each triangle
 	for (size_t i = 0; i < vertCount; i+=3)
@@ -271,12 +273,11 @@ void Mesh::CalculateTangents(std::vector<Vertex>& vertices, std::vector<XMFLOAT3
 		float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
 		//calculating the tangent of the triangle
 		XMFLOAT3 tangent; 
-		XMStoreFloat3(&tangent,XMLoadFloat3(&edge1) * deltaUV2.y - XMLoadFloat3(&edge2) * deltaUV1.y);
+		XMStoreFloat3(&tangent, (XMLoadFloat3(&edge1) * deltaUV2.y - XMLoadFloat3(&edge2) * deltaUV1.y )*r);
 
-		//adding the tangents to the list, same for all three vertices
-		tangents.emplace_back(tangent);
-		tangents.emplace_back(tangent);
-		tangents.emplace_back(tangent);
+		vertices[i].tangent = tangent;
+		vertices[i + 1].tangent = tangent;
+		vertices[i + 2].tangent = tangent;
 
 	}
 }

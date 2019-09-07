@@ -4,6 +4,7 @@
 #include"Mesh.h"
 #include<memory>
 #include"SimpleShader.h"
+#include"DDSTextureLoader.h"
 using namespace DirectX;
 class Skybox
 {
@@ -23,14 +24,29 @@ class Skybox
 	SimplePixelShader* pixelShader;
 	SimpleVertexShader* vertexShader;
 
+	//texture and samplestate
+	ID3D11ShaderResourceView* textureSRV;
+	ID3D11SamplerState* sampleState;
+
+	//number of indices
+	unsigned int numIndices;
+
 public:
 	Skybox();
 	~Skybox();
 
 	//method to load skybox
-	void LoadSkybox(std::shared_ptr<Mesh> skyboxMesh);
+	void LoadSkybox(std::wstring fileName,ID3D11Device* device, ID3D11DeviceContext* context,ID3D11SamplerState* sampleState);
 	
 	//method to draw skybox
-	void DrawSkybox(XMFLOAT4X4 view, XMFLOAT4X4 projection);
+	void PrepareSkybox(XMFLOAT4X4 view, XMFLOAT4X4 projection,XMFLOAT3 cameraPos);
+
+	//getters
+	ID3D11Buffer* GetVertexBuffer();
+	ID3D11Buffer* GetIndexBuffer();
+	unsigned int GetIndexCount();
+	unsigned int GetStride();
+
+	std::shared_ptr<Mesh> cubeMesh;
 };
 

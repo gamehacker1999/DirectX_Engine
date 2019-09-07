@@ -1,12 +1,31 @@
-struct VertexShaderInput
+/*struct VertexShaderInput
 {
 	float3 position		: POSITION;
+};*/
+
+// Struct representing a single vertex worth of data
+// - This should match the vertex definition in our C++ code
+// - By "match", I mean the size, order and number of members
+// - The name of the struct itself is unimportant, but should be descriptive
+// - Each variable must have a semantic, which defines its usage
+struct VertexShaderInput
+{
+	// Data type
+	//  |
+	//  |   Name          Semantic
+	//  |    |                |
+	//  v    v                v
+	float3 position		: POSITION;     // XYZ position
+	//float4 color		: COLOR;        // RGBA color
+	float3 normal		: NORMAL;		//Normal of the vertex
+	float3 tangent		: TANGENT;      //tangent of the vertex
+	float2 uv			: TEXCOORD;		//Texture coordinates
 };
 
 struct VertexToPixel
 {
 	float4 position		: SV_POSITION;
-	float3 worldPos		: POSITION;
+	float3 worldPos		: TEXCOORD;
 };
 
 //cbuffer for matrix position
@@ -27,10 +46,14 @@ VertexToPixel main(VertexShaderInput input)
 	matrix viewProj = mul(view, projection);
 
 	//calculating the vertex position
-	output.position = mul(float4(cameraPos, 1.0), viewProj);
+	float4 posWorld = float4(input.position, 1.0);
+	posWorld.xyz += cameraPos;
+
+	//getting the perspective devide to be equal to one
+	output.position = mul(posWorld, viewProj).xyww;
 
 	//sending the world position to pixelshader
-	output.worldPos = cameraPos;
+	output.worldPos = input.position;
 
 	return output;
 }
