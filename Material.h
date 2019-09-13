@@ -45,5 +45,8 @@ public:
 	ID3D11ShaderResourceView* GetNormalTextureSRV();
 	ID3D11ShaderResourceView* GetRoughnessSRV();
 	ID3D11ShaderResourceView* GetMetalnessSRV();
+
+	//function to send texture to pixelshader
+	void SetPixelShaderData();
 };
 

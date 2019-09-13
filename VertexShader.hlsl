@@ -10,6 +10,8 @@ cbuffer externalData : register(b0)
 	matrix world;
 	matrix view;
 	matrix projection;
+	matrix lightView;
+	matrix lightProj;
 };
 
 // Struct representing a single vertex worth of data
@@ -44,6 +46,7 @@ struct VertexToPixel
 	//  |    |                |
 	//  v    v                v
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
+	float4 lightPos		: TEXCOORD1;
 	//float4 color		: COLOR;        // RGBA color
 	float3 normal		: NORMAL;		//normal of the vertex
 	float3 worldPosition: POSITION; //position of vertex in world space
@@ -90,6 +93,11 @@ VertexToPixel main( VertexShaderInput input )
 
 	//sending the UV coordinates
 	output.uv = input.uv;
+
+	matrix lightWorldViewProj = mul(mul(world, lightView), lightProj);
+
+	//sending the the shadow position
+	output.lightPos = mul(float4(input.position, 1.0f), lightWorldViewProj);
 
 	// Pass the color through 
 	// - The values will be interpolated per-pixel by the rasterizer

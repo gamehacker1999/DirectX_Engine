@@ -65,8 +65,8 @@ float GeometricShadowing(
 float SpecularDistribution(float roughness, float3 h, float3 n)
 {
 	//remapping the roughness
-	//float a = pow(roughness, 2);
-	float a2 = roughness * roughness;
+	float a = pow(roughness, 2);
+	float a2 = a * a;
 
 	float PI = 3.14159265f;
 
@@ -101,9 +101,9 @@ float4 CalculateDiffuse(float3 n, float3 l, float4 diffuseColor, DirectionalLigh
 	float NdotL = dot(N, L);
 	NdotL = saturate(NdotL); //this is the light amount, we need to clamp it to 0 and 1.0
 
-	//adding diffuse, ambient, and specular color
+	//adding diffuse, ambient color
 	float4 finalLight = light.diffuse * NdotL;
-
+	//finalLight += light.ambientColor;
 	return finalLight;
 }
 
@@ -111,18 +111,27 @@ float4 CalculateDiffuse(float3 n, float3 l, float4 diffuseColor, DirectionalLigh
 float3 DiffuseEnergyConserve(
 	float3 diffuse, float3 specular, float3 metalness)
 {
-	return
-		diffuse *
-		((1 - saturate(specular)) * (1 - metalness));
+	return diffuse *((1 - saturate(specular)) * (1 - metalness));
 }
-
 
 //textures and basic sampler
 Texture2D diffuseTexture: register(t0);
 Texture2D normalMap: register(t1);
 Texture2D roughnessMap: register(t2);
 Texture2D metalnessMap: register(t3);
+TextureCube cubeMap: register(t4);
 SamplerState basicSampler: register(s0);
+
+float4 CalculateEnvironmentReflection(float3 normal, float3 position)
+{
+	float3 I = position - cameraPosition;
+	I = normalize(I); //incident ray
+	float3 reflected = reflect(I, normal);
+
+	float4 reflectedColor = cubeMap.Sample(basicSampler, reflected);
+
+	return reflectedColor;
+}
 
 float4 main(VertexToPixel input) : SV_TARGET
 {
@@ -147,6 +156,9 @@ float4 main(VertexToPixel input) : SV_TARGET
 	//getting the metalness of the pixel
 	float3 metalColor = metalnessMap.Sample(basicSampler, input.uv).xyz;
 
+	float3 f0 = float3(0.04f, 0.04f, 0.04f);
+	f0 = lerp(f0, surfaceColor.xyz, metalColor);
+
 	//getting the roughness of pixel
 	float roughness = roughnessMap.Sample(basicSampler, input.uv).x;
 
@@ -156,14 +168,16 @@ float4 main(VertexToPixel input) : SV_TARGET
 	N = normalize(N); //normalizing the normal
 	float3 R = reflect(-L, N); //reflect R over N
 	float3 V = normalize(cameraPosition - input.worldPosition); //view vector
-	float3 H = normalize(L+V);
+	float3 H = normalize(L+V/2);
 
 	float4 diffuse = CalculateDiffuse(N, L, light.diffuse,light);
-	float3 specular = CookTorrence( N, H, roughness, V, metalColor, L);
+	float3 specular = CookTorrence( N, H, roughness, V, f0, L);
 
 	float3 finalDiffuse=DiffuseEnergyConserve(diffuse.xyz, specular, metalColor);
 
-	float4 finalColor = float4((finalDiffuse)*surfaceColor + specular,1.0f);
+	float4 skyboxReflection = CalculateEnvironmentReflection(finalNormal, input.worldPosition);
+
+	float4 finalColor = float4(finalDiffuse + specular+light.ambientColor.xyz,1.0f)*surfaceColor;
 
 	return finalColor;
 }

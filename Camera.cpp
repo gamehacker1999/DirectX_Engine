@@ -38,7 +38,10 @@ void Camera::CreateProjectionMatrix(float aspectRatio)
 		aspectRatio,				// Aspect ratio
 		0.1f,						// Near clip plane distance
 		100.0f);					// Far clip plane distance
+	//XMMATRIX P = XMMatrixOrthographicLH(16, 9, 0.1f, 1000.0f);
+
 	XMStoreFloat4x4(&projectionMatrix, XMMatrixTranspose(P)); // Transpose for HLSL!
+
 }
 
 void Camera::ManageKeyboard(float deltaTime)

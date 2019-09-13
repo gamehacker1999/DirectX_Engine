@@ -23,6 +23,7 @@ Game::Game(HINSTANCE hInstance)
 	// Initialize fields
 	vertexShader = 0;
 	pixelShader = 0;
+	shadowVertexShader = nullptr;
 
 	prevMousePos = { 0,0 };	
 
@@ -45,6 +46,9 @@ Game::~Game()
 	// will clean up their own internal DirectX stuff
 	delete vertexShader;
 	delete pixelShader;
+	
+	if (shadowVertexShader)
+		delete shadowVertexShader;
 
 	//releasing depth stencil
 	dssLessEqual->Release();
@@ -72,7 +76,7 @@ void Game::Init()
 	//specifying the directional light
 	directionalLight.ambientColor = XMFLOAT4(0.1f, 0.1f ,0.1f,1.f);
 	directionalLight.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	directionalLight.direction = XMFLOAT3(1.0f, -1.0f, 0.0f);
+	directionalLight.direction = XMFLOAT3(0.0f, 0.0f, 1.0f);
 
 	//second light
 	directionalLight2.ambientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
@@ -108,7 +112,10 @@ void Game::LoadShaders()
 	vertexShader->LoadShaderFile(L"VertexShader.cso");
 
 	pixelShader = new SimplePixelShader(device, context);
-	pixelShader->LoadShaderFile(L"PBRPixelShader.cso");
+	pixelShader->LoadShaderFile(L"PixelShader.cso");
+
+	shadowVertexShader = new SimpleVertexShader(device, context);
+	shadowVertexShader->LoadShaderFile(L"ShadowsVS.cso");
 }
 
 
@@ -167,17 +174,17 @@ void Game::CreateBasicGeometry()
 
 	ID3D11ShaderResourceView* textureSRV;
 	//trying to load a texture
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredDiffuse.png",0,&textureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldDiffuse.png",0,&textureSRV);
 
 	//trying to load a normalMap
 	ID3D11ShaderResourceView* normalTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredNormal.png", 0, &normalTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldNormal.png", 0, &normalTextureSRV);
 
 	ID3D11ShaderResourceView* roughnessTextureSRV;
 	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredRoughness.png", 0, &roughnessTextureSRV);
 
 	ID3D11ShaderResourceView* metalnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredMetal.png", 0, &metalnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GridMetallic.png", 0, &metalnessTextureSRV);
 
 	//creating a sampler state
 	ID3D11SamplerState* samplerState;
@@ -196,9 +203,18 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Material> material = std::make_shared<Material>(vertexShader, pixelShader,samplerState,
 		textureSRV, normalTextureSRV,roughnessTextureSRV,metalnessTextureSRV);
 
-	std::shared_ptr<Mesh> cube = std::make_shared<Mesh>("../../Assets/Models/sphere.obj",device);
+	std::shared_ptr<Mesh> sphere = std::make_shared<Mesh>("../../Assets/Models/cube.obj",device);
+	std::shared_ptr<Mesh> helix = std::make_shared<Mesh>("../../Assets/Models/sphere.obj", device);
 
-	entities.emplace_back(std::make_shared<Entity>(cube, material));
+
+	entities.emplace_back(std::make_shared<Entity>(sphere, material));
+	entities.emplace_back(std::make_shared<Entity>(helix, material));
+
+	auto position = entities[1]->GetPosition();
+	position.x -= 0;
+	position.z += 1;
+	entities[0]->SetPosition(position);
+	entities[0]->SetScale(XMFLOAT3(2, 2, 2));
 	//entities[0]->SetScale(XMFLOAT3(2.f, 2.f, 2.f));
 
 	ID3D11SamplerState* samplerStateCube;
@@ -262,6 +278,57 @@ void Game::Draw(float deltaTime, float totalTime)
 	// Background color (Cornflower Blue in this case) for clearing
 	const float color[4] = { 0.4f, 0.6f, 0.75f, 0.0f };
 
+	//stride of each vertex
+	UINT stride = sizeof(Vertex);
+	UINT offset = 0;
+
+	//set depth stencil view to render everything to the shadow depth buffer
+	/**/context->ClearRenderTargetView(backBufferRTV, color);
+	context->ClearDepthStencilView(shadowDepthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	context->OMSetRenderTargets(0, nullptr, shadowDepthStencil);
+
+	context->RSSetViewports(1, &shadowViewport);
+	//context->RSSetState(shadowRasterizerState);
+
+	XMFLOAT3 directionLightPosition;
+	XMFLOAT3 center(0.0f, 0.0f, 0.0f);
+	XMFLOAT3 up(0.0f, 1.0f, 0.0f);
+
+	//taking the center of the camera and backing up from the direction of the light
+	//this is the position of the light
+	XMStoreFloat3(&directionLightPosition, XMLoadFloat3(&center) - XMLoadFloat3(&directionalLight.direction) * 30.f);
+	//creating the camera look to matrix
+	auto tempLightView = XMMatrixLookToLH(XMLoadFloat3(&directionLightPosition), 
+		XMLoadFloat3(&directionalLight.direction), XMLoadFloat3(&up));
+
+	//storing the light view matrix
+	XMFLOAT4X4 lightView;
+	XMStoreFloat4x4(&lightView, XMMatrixTranspose(tempLightView));
+
+	//calculating projection matrix
+	XMFLOAT4X4 lightProjection;
+	XMMATRIX tempLightProjection = XMMatrixOrthographicOffCenterLH(-5.f, 5.f, -5.f, 5.f, 0.1f, 1000.f);
+	XMStoreFloat4x4(&lightProjection, XMMatrixTranspose(tempLightProjection));
+
+	context->PSSetShader(0, 0, 0); //no pixel shader for shadows
+	shadowVertexShader->SetShader();
+
+
+	for (size_t i = 0; i < entities.size(); i++)
+	{
+		auto tempVertexBuffer = entities[i]->GetMesh()->GetVertexBuffer();
+		shadowVertexShader->SetMatrix4x4("view", lightView);
+		shadowVertexShader->SetMatrix4x4("projection", lightProjection);
+		shadowVertexShader->SetMatrix4x4("worldMatrix", entities[i]->GetModelMatrix());
+		shadowVertexShader->CopyAllBufferData();
+		context->IASetVertexBuffers(0, 1, &tempVertexBuffer, &stride, &offset);
+		context->IASetIndexBuffer(entities[i]->GetMesh()->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+
+		//drawing the entity
+		context->DrawIndexed(entities[i]->GetMesh()->GetIndexCount(), 0, 0);
+	}
+
+	
 	// Clear the render target and depth buffer (erases what's on the screen)
 	//  - Do this ONCE PER FRAME
 	//  - At the beginning of Draw (before drawing *anything*)
@@ -272,27 +339,28 @@ void Game::Draw(float deltaTime, float totalTime)
 		1.0f,
 		0);
 
-	UINT stride = sizeof(Vertex);
-	UINT offset = 0;
+	context->RSSetState(nullptr);
+	context->RSSetViewports(1, &viewport);
+
+	context->OMSetRenderTargets(1, &backBufferRTV, depthStencilView);
 
 	//looping through the entities to draw them
 	for (size_t i = 0; i < entities.size(); i++)
 	{
 		//preparing material for entity
+		//entities[i]->GetMaterial()->GetVertexShader()->SetMatrix4x4("lightView", lightView);
+		//entities[i]->GetMaterial()->GetVertexShader()->SetMatrix4x4("lightProj", lightProjection);
 		entities[i]->PrepareMaterial(camera->GetViewMatrix(), camera->GetProjectionMatrix());
 
 		//adding lights and sending camera position
-		pixelShader->SetData("light", &directionalLight, sizeof(DirectionalLight)); //adding directional lights to the scene
-		pixelShader->SetData("light2", &directionalLight2, sizeof(DirectionalLight));
-		pixelShader->SetFloat3("cameraPosition",camera->GetPosition());
+		entities[i]->GetMaterial()->GetPixelShader()->SetData("light", &directionalLight, sizeof(DirectionalLight)); //adding directional lights to the scene
+		//entities[i]->GetMaterial()->GetPixelShader()->SetData("light2", &directionalLight2, sizeof(DirectionalLight));
+		entities[i]->GetMaterial()->GetPixelShader()->SetFloat3("cameraPosition",camera->GetPosition());
 
-		//setting the sampler state and textures
-		pixelShader->SetSamplerState("basicSampler", entities[i]->GetMaterial()->GetSamplerState());
-		pixelShader->SetShaderResourceView("diffuseTexture", entities[i]->GetMaterial()->GetTextureSRV());
-		pixelShader->SetShaderResourceView("normalMap", entities[i]->GetMaterial()->GetNormalTextureSRV());
-		pixelShader->SetShaderResourceView("roughnessMap", entities[i]->GetMaterial()->GetRoughnessSRV());
-		pixelShader->SetShaderResourceView("metalnessMap", entities[i]->GetMaterial()->GetMetalnessSRV());
-		pixelShader->CopyAllBufferData();
+		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("cubeMap", skybox->GetSkyboxTexture());
+		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("shadowMap", shadowSRV);
+		entities[i]->GetMaterial()->GetPixelShader()->SetSamplerState("shadowSampler", shadowSamplerState);
+		entities[i]->GetMaterial()->SetPixelShaderData();
 
 		//setting the vertex and index buffer
 		auto tempVertexBuffer = entities[i]->GetMesh()->GetVertexBuffer();
@@ -323,7 +391,9 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	// Due to the usage of a more sophisticated swap chain effect,
 	// the render target must be re-bound after every call to Present()
-	context->OMSetRenderTargets(1, &backBufferRTV, depthStencilView);
+	context->OMSetRenderTargets(1,&backBufferRTV, depthStencilView);
+
+	
 }
 
 

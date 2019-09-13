@@ -79,3 +79,25 @@ ID3D11ShaderResourceView* Material::GetMetalnessSRV()
 {
 	return metalnessTextureSRV;
 }
+
+void Material::SetPixelShaderData()
+{
+	//sending the sampler state and textures to pixel shader
+	if (samplerState)
+		pixelShader->SetSamplerState("basicSampler", samplerState);
+
+	if(textureSRV)
+		pixelShader->SetShaderResourceView("diffuseTexture", textureSRV);
+
+	if(normalTextureSRV)
+		pixelShader->SetShaderResourceView("normalMap", normalTextureSRV);
+
+	if(roughnessTextureSRV)
+		pixelShader->SetShaderResourceView("roughnessMap", roughnessTextureSRV);
+
+	if(metalnessTextureSRV)
+		pixelShader->SetShaderResourceView("metalnessMap", metalnessTextureSRV);
+
+	pixelShader->CopyAllBufferData();
+
+}

@@ -12,6 +12,7 @@ struct VertexToPixel
 	//  |    |                |
 	//  v    v                v
 	float4 position		: SV_POSITION;
+	float4 lightPos		: TEXCOORD1;
 	float3 normal		: NORMAL;
 	float3 worldPosition: POSITION; //position of vertex in world space
 	float3 tangent		: TANGENT;	//tangent of the vertex
@@ -52,7 +53,7 @@ float4 CalculateLight(DirectionalLight light, float3 normal, VertexToPixel input
 	//I am calculating the light based on the phong reflection model
 	float cosine = dot(R, V);
 	cosine = saturate(cosine);
-	float shininess = 32;
+	float shininess = 4;
 	float specularAmount = pow(cosine, shininess);
 
 	float NdotL = dot(N, L);
@@ -69,7 +70,11 @@ float4 CalculateLight(DirectionalLight light, float3 normal, VertexToPixel input
 //texture variables
 Texture2D diffuseTexture: register(t0);
 SamplerState basicSampler: register(s0);
+SamplerComparisonState shadowSampler: register(s1);
 Texture2D normalMap : register(t1);
+TextureCube cubeMap: register(t2);
+Texture2D shadowMap	: register(t3);
+
 
 // --------------------------------------------------------
 // The entry point (main method) for our pixel shader
@@ -89,7 +94,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 	//return input.color;
 
 	float3 normalColor = normalMap.Sample(basicSampler,input.uv).xyz;
-
 	float3 unpackedNormal = normalColor * 2.0f - 1.0f;
 
 	//orthonormalizing T, B and N using the gram-schimdt process
@@ -103,7 +107,29 @@ float4 main(VertexToPixel input) : SV_TARGET
 	//transforming normal from map to world space
 	float3 finalNormal = mul(unpackedNormal, TBN);
 
+	//calculating cubemap reflections
+	float3 I = input.worldPosition - cameraPosition;
+	I = normalize(I); //incident ray
+	float3 reflected = reflect(I, finalNormal);
+
+	float4 reflectedColor = cubeMap.Sample(basicSampler, reflected);
+
 	float4 surfaceColor = diffuseTexture.Sample(basicSampler,input.uv);
 
-	return (CalculateLight(light,finalNormal,input)+CalculateLight(light2,finalNormal,input))*surfaceColor;
+	//doing calculations from shadow map to see if it is a shadow or not
+	float lightDepth = input.lightPos.z / input.lightPos.w;
+
+	//adjust the -1 to 1 range to 0 to 1
+	float2 shadowUV = input.lightPos.xy / input.lightPos.w * 0.5f + 0.5f;
+
+	//flip the y coordinates
+	shadowUV.y = 1.0f - shadowUV.y;
+
+	//read shadow map for closest surface
+	float shadowDepth = shadowMap.Sample(basicSampler, shadowUV).r;
+
+	if (shadowDepth <= lightDepth) return light.ambientColor;
+
+	//return shadowDepth;
+	return (CalculateLight(light,finalNormal,input))*surfaceColor;
 }
