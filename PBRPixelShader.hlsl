@@ -7,7 +7,7 @@ struct VertexToPixel
 	//  |    |                |
 	//  v    v                v
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
-	//float4 color		: COLOR;        // RGBA color
+	float4 lightPos		: TEXCOORD1;
 	float3 normal		: NORMAL;		//normal of the vertex
 	float3 worldPosition: POSITION; //position of vertex in world space
 	float3 tangent		: TANGENT;	//tangent of the vertex

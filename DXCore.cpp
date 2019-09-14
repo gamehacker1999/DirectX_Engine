@@ -269,29 +269,33 @@ HRESULT DXCore::InitDirectX()
 	viewport.Height = (float)height;
 	viewport.MinDepth = 0.0f;
 	viewport.MaxDepth = 1.0f;
-	context->RSSetViewports(1, &viewport);
+	//context->RSSetViewports(1, &viewport);
 
 	// Bind the views to the pipeline, so rendering properly 
 	// uses their underlying textures
-	context->OMSetRenderTargets(1, &backBufferRTV, depthStencilView);
+	//context->OMSetRenderTargets(1, &backBufferRTV, depthStencilView);
 
 	//description of the shadow mapping depth buffer
 	D3D11_TEXTURE2D_DESC shadowMapDesc;
-	memset(&shadowMapDesc, 0, sizeof(shadowMapDesc));
+	ZeroMemory(&shadowMapDesc, sizeof(D3D11_TEXTURE2D_DESC));
 	shadowMapDesc.Width = 1024;
 	shadowMapDesc.Height = 1024;
 	shadowMapDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
 	shadowMapDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 	shadowMapDesc.ArraySize = 1;
 	shadowMapDesc.MipLevels = 1;
+	shadowMapDesc.CPUAccessFlags = 0;
+	shadowMapDesc.MiscFlags = 0;
 	shadowMapDesc.SampleDesc.Count = 1;
+	shadowMapDesc.SampleDesc.Quality = 0;
+	shadowMapDesc.Usage = D3D11_USAGE_DEFAULT;
 
 	//creating a texture
 	device->CreateTexture2D(&shadowMapDesc, nullptr, &shadowMapTexture);
 
 	//description for depth stencil view
 	D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
-	memset(&depthStencilViewDesc, 0, sizeof(depthStencilViewDesc));
+	ZeroMemory(&depthStencilViewDesc, sizeof(D3D11_DEPTH_STENCIL_VIEW_DESC));
 	depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
 	depthStencilViewDesc.Texture2D.MipSlice = 0;
 	depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
@@ -300,7 +304,7 @@ HRESULT DXCore::InitDirectX()
 
 	//creating a shader resource view
 	D3D11_SHADER_RESOURCE_VIEW_DESC shadowSRVDesc;
-	memset(&shadowSRVDesc, 0, sizeof(shadowSRVDesc));
+	ZeroMemory(&shadowSRVDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
 	shadowSRVDesc.Format = DXGI_FORMAT_R32_FLOAT;
 	shadowSRVDesc.Texture2D.MipLevels = 1;
 	shadowSRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
@@ -308,18 +312,24 @@ HRESULT DXCore::InitDirectX()
 	device->CreateShaderResourceView(shadowMapTexture, &shadowSRVDesc, &shadowSRV);
 
 	//setting up the shadow viewport
-	memset(&shadowViewport, 0, sizeof(shadowViewport));
+	ZeroMemory(&shadowViewport, sizeof(D3D11_VIEWPORT));
 	shadowViewport.Width = 1024.0f;
 	shadowViewport.Height = 1024.0f;
 	shadowViewport.MinDepth = 0.0f;
 	shadowViewport.MaxDepth = 1.0f;
+	shadowViewport.TopLeftX = 0.0f;
+	shadowViewport.TopLeftY = 0.0f;
 
 	//rasterizer for pixel shader
 	D3D11_RASTERIZER_DESC shadowRasterizerDesc;
+	ZeroMemory(&shadowRasterizerDesc,sizeof(D3D11_RASTERIZER_DESC));
 	shadowRasterizerDesc.FillMode = D3D11_FILL_SOLID;
-	shadowRasterizerDesc.CullMode = D3D11_CULL_FRONT;
+	shadowRasterizerDesc.CullMode = D3D11_CULL_BACK;
 	shadowRasterizerDesc.DepthClipEnable = true;
 	shadowRasterizerDesc.FrontCounterClockwise = false;
+	shadowRasterizerDesc.DepthBias = 1000;
+	shadowRasterizerDesc.DepthBiasClamp = 0.0f;
+	shadowRasterizerDesc.SlopeScaledDepthBias = 1.0f;
 
 	//creating this rasterizer
 	device->CreateRasterizerState(&shadowRasterizerDesc, &shadowRasterizerState);
@@ -330,7 +340,6 @@ HRESULT DXCore::InitDirectX()
 	shadowSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
 	shadowSamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
 	shadowSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
-	shadowSamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 	shadowSamplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 	shadowSamplerDesc.BorderColor[0] = 1.0f;
 	shadowSamplerDesc.BorderColor[1] = 1.0f;
@@ -403,7 +412,7 @@ void DXCore::OnResize()
 
 	// Bind the views to the pipeline, so rendering properly 
 	// uses their underlying textures
-	context->OMSetRenderTargets(1, &backBufferRTV, depthStencilView);
+	//context->OMSetRenderTargets(1, &backBufferRTV, depthStencilView);
 
 	// Lastly, set up a viewport so we render into
 	// to correct portion of the window
@@ -414,7 +423,7 @@ void DXCore::OnResize()
 	viewport.Height = (float)height;
 	viewport.MinDepth = 0.0f;
 	viewport.MaxDepth = 1.0f;
-	context->RSSetViewports(1, &viewport);
+	//context->RSSetViewports(1, &viewport);
 
 }
 

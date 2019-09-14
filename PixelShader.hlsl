@@ -38,6 +38,14 @@ cbuffer LightData: register(b0)
 	float3 cameraPosition;
 };
 
+//texture variables
+Texture2D diffuseTexture: register(t0);
+SamplerState basicSampler: register(s0);
+SamplerComparisonState shadowSampler: register(s1);
+Texture2D normalMap : register(t1);
+TextureCube cubeMap: register(t2);
+Texture2D shadowMap	: register(t3);
+
 //function that accepts light and normal and then calculates the final color
 float4 CalculateLight(DirectionalLight light, float3 normal, VertexToPixel input)
 {
@@ -61,19 +69,33 @@ float4 CalculateLight(DirectionalLight light, float3 normal, VertexToPixel input
 
 	//adding diffuse, ambient, and specular color
 	float4 finalLight = light.diffuse * NdotL;
-	finalLight += light.ambientColor;
 	finalLight += specularAmount;
 
 	return finalLight;
 }
 
-//texture variables
-Texture2D diffuseTexture: register(t0);
-SamplerState basicSampler: register(s0);
-SamplerComparisonState shadowSampler: register(s1);
-Texture2D normalMap : register(t1);
-TextureCube cubeMap: register(t2);
-Texture2D shadowMap	: register(t3);
+//calculate shadows
+float ShadowCalculation(DirectionalLight light,float2 shadowUV,float lightDepth)
+{
+
+	//getting the width and height of shadow map
+	float w;
+	float h;
+	float shadowDepth = 0.0f;
+
+	shadowMap.GetDimensions(w, h);
+
+	for (float j = -1.0f; j <= 1.0f; j++)
+	{
+		for (float i = -1.0f; i <= 1.0f; i++)
+		{
+			float2 offset = float2(i / (float)w, j / (float)h);
+			shadowDepth += shadowMap.SampleCmpLevelZero(shadowSampler, offset+shadowUV, lightDepth);
+		}
+	}
+
+	return (shadowDepth / 9.0f);
+}
 
 
 // --------------------------------------------------------
@@ -126,10 +148,8 @@ float4 main(VertexToPixel input) : SV_TARGET
 	shadowUV.y = 1.0f - shadowUV.y;
 
 	//read shadow map for closest surface
-	float shadowDepth = shadowMap.Sample(basicSampler, shadowUV).r;
-
-	if (shadowDepth <= lightDepth) return light.ambientColor;
+	float shadowDepth = ShadowCalculation(light, shadowUV, lightDepth);
 
 	//return shadowDepth;
-	return (CalculateLight(light,finalNormal,input))*surfaceColor;
+	return ((CalculateLight(light,finalNormal,input)*shadowDepth)+light.ambientColor)*surfaceColor;
 }

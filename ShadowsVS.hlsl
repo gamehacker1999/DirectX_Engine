@@ -1,5 +1,5 @@
 
-cbuffer externalDate: register(b0)
+cbuffer externalData: register(b0)
 {
 	matrix view; //light view matrix
 	matrix projection; //light projection

@@ -9,6 +9,7 @@
 #include"Camera.h"
 #include"Lights.h"
 #include"Skybox.h"
+#include"Textures.h"
 class Game 
 	: public DXCore
 {
@@ -42,6 +43,7 @@ private:
 
 	//vertexshader for shadows
 	SimpleVertexShader* shadowVertexShader;
+	SimplePixelShader* shadowPixelShader;
 
 	// The matrices to go from model space to screen space
 	DirectX::XMFLOAT4X4 worldMatrix;

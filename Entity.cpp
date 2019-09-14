@@ -72,7 +72,7 @@ XMFLOAT4X4 Entity::GetModelMatrix()
 
 		//calculating the model matrix from these three matrices and storing it
 		//we transpose it before storing the matrix
-		 XMStoreFloat4x4(&modelMatrix,XMMatrixTranspose(translate*rotationMat*scaleMat));
+		 XMStoreFloat4x4(&modelMatrix,XMMatrixTranspose(scaleMat*rotationMat*translate));
 
 		recalculateMatrix = false;
 	}

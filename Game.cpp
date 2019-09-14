@@ -24,6 +24,7 @@ Game::Game(HINSTANCE hInstance)
 	vertexShader = 0;
 	pixelShader = 0;
 	shadowVertexShader = nullptr;
+	shadowPixelShader = nullptr;
 
 	prevMousePos = { 0,0 };	
 
@@ -49,6 +50,9 @@ Game::~Game()
 	
 	if (shadowVertexShader)
 		delete shadowVertexShader;
+
+	if (shadowPixelShader)
+		delete shadowPixelShader;
 
 	//releasing depth stencil
 	dssLessEqual->Release();
@@ -76,7 +80,7 @@ void Game::Init()
 	//specifying the directional light
 	directionalLight.ambientColor = XMFLOAT4(0.1f, 0.1f ,0.1f,1.f);
 	directionalLight.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	directionalLight.direction = XMFLOAT3(0.0f, 0.0f, 1.0f);
+	directionalLight.direction = XMFLOAT3(0.0f, -1.0f, 1.0f);
 
 	//second light
 	directionalLight2.ambientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
@@ -108,6 +112,7 @@ void Game::Init()
 // --------------------------------------------------------
 void Game::LoadShaders()
 {
+
 	vertexShader = new SimpleVertexShader(device, context);
 	vertexShader->LoadShaderFile(L"VertexShader.cso");
 
@@ -116,6 +121,9 @@ void Game::LoadShaders()
 
 	shadowVertexShader = new SimpleVertexShader(device, context);
 	shadowVertexShader->LoadShaderFile(L"ShadowsVS.cso");
+
+	shadowPixelShader = new SimplePixelShader(device, context);
+	shadowPixelShader->LoadShaderFile(L"ShadowsPS.cso");
 }
 
 
@@ -205,17 +213,23 @@ void Game::CreateBasicGeometry()
 
 	std::shared_ptr<Mesh> sphere = std::make_shared<Mesh>("../../Assets/Models/cube.obj",device);
 	std::shared_ptr<Mesh> helix = std::make_shared<Mesh>("../../Assets/Models/sphere.obj", device);
+	std::shared_ptr<Mesh> object = std::make_shared<Mesh>("../../Assets/Models/helix.obj", device);
 
 
 	entities.emplace_back(std::make_shared<Entity>(sphere, material));
 	entities.emplace_back(std::make_shared<Entity>(helix, material));
+	entities.emplace_back(std::make_shared<Entity>(object, material));
+
 
 	auto position = entities[1]->GetPosition();
-	position.x -= 0;
-	position.z += 1;
+	position.x -= 0.f;
+	position.z += 2.f;
+	position.y -= 5.6f;
 	entities[0]->SetPosition(position);
 	entities[0]->SetScale(XMFLOAT3(2, 2, 2));
-	//entities[0]->SetScale(XMFLOAT3(2.f, 2.f, 2.f));
+	entities[0]->SetScale(XMFLOAT3(10.f, 10.f, 10.f));
+
+	entities[2]->SetPosition(XMFLOAT3(-2.f, 1.f, 0.f));
 
 	ID3D11SamplerState* samplerStateCube;
 	//sampler state description
@@ -283,12 +297,12 @@ void Game::Draw(float deltaTime, float totalTime)
 	UINT offset = 0;
 
 	//set depth stencil view to render everything to the shadow depth buffer
-	/**/context->ClearRenderTargetView(backBufferRTV, color);
+	//context->ClearRenderTargetView(backBufferRTV, color);
 	context->ClearDepthStencilView(shadowDepthStencil, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	context->OMSetRenderTargets(0, nullptr, shadowDepthStencil);
 
 	context->RSSetViewports(1, &shadowViewport);
-	//context->RSSetState(shadowRasterizerState);
+	context->RSSetState(shadowRasterizerState);
 
 	XMFLOAT3 directionLightPosition;
 	XMFLOAT3 center(0.0f, 0.0f, 0.0f);
@@ -296,7 +310,7 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	//taking the center of the camera and backing up from the direction of the light
 	//this is the position of the light
-	XMStoreFloat3(&directionLightPosition, XMLoadFloat3(&center) - XMLoadFloat3(&directionalLight.direction) * 30.f);
+	XMStoreFloat3(&directionLightPosition, XMLoadFloat3(&center) - XMLoadFloat3(&directionalLight.direction) * 10000.f);
 	//creating the camera look to matrix
 	auto tempLightView = XMMatrixLookToLH(XMLoadFloat3(&directionLightPosition), 
 		XMLoadFloat3(&directionalLight.direction), XMLoadFloat3(&up));
@@ -307,12 +321,12 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	//calculating projection matrix
 	XMFLOAT4X4 lightProjection;
-	XMMATRIX tempLightProjection = XMMatrixOrthographicOffCenterLH(-5.f, 5.f, -5.f, 5.f, 0.1f, 1000.f);
+	XMMATRIX tempLightProjection = XMMatrixOrthographicLH((float)shadowViewport.Width/100.f,(float)shadowViewport.Height/100.f,
+		0.0f,1000000.0f);
 	XMStoreFloat4x4(&lightProjection, XMMatrixTranspose(tempLightProjection));
 
-	context->PSSetShader(0, 0, 0); //no pixel shader for shadows
 	shadowVertexShader->SetShader();
-
+	context->PSSetShader(nullptr, nullptr, 0);
 
 	for (size_t i = 0; i < entities.size(); i++)
 	{
@@ -348,8 +362,8 @@ void Game::Draw(float deltaTime, float totalTime)
 	for (size_t i = 0; i < entities.size(); i++)
 	{
 		//preparing material for entity
-		//entities[i]->GetMaterial()->GetVertexShader()->SetMatrix4x4("lightView", lightView);
-		//entities[i]->GetMaterial()->GetVertexShader()->SetMatrix4x4("lightProj", lightProjection);
+		entities[i]->GetMaterial()->GetVertexShader()->SetMatrix4x4("lightView", lightView);
+		entities[i]->GetMaterial()->GetVertexShader()->SetMatrix4x4("lightProj", lightProjection);
 		entities[i]->PrepareMaterial(camera->GetViewMatrix(), camera->GetProjectionMatrix());
 
 		//adding lights and sending camera position
@@ -369,6 +383,8 @@ void Game::Draw(float deltaTime, float totalTime)
 
 		//drawing the entity
 		context->DrawIndexed(entities[i]->GetMesh()->GetIndexCount(), 0, 0);
+
+		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("shadowMap", nullptr);
 	}
 
 	context->OMSetDepthStencilState(dssLessEqual, 0);
