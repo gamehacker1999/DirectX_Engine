@@ -25,6 +25,23 @@ Game::Game(HINSTANCE hInstance)
 	pixelShader = 0;
 	shadowVertexShader = nullptr;
 	shadowPixelShader = nullptr;
+	pbrPixelShader = nullptr;
+
+	cubemapViews.reserve(6); //6 view matrices for 6 faces of the cube
+
+	irradianceMapTexture = nullptr;
+	irradienceDepthStencil = nullptr;
+	irradienceSRV = nullptr;
+	irradiancePS = nullptr;
+	irradianceVS = nullptr;
+
+	prefilteredSRV = nullptr;
+	prefileteredMapTexture = nullptr;
+	prefilteredMapPS = nullptr;
+
+	integrationBRDFPS = nullptr;
+
+	fullScreenTriangleVS = nullptr;
 
 	prevMousePos = { 0,0 };	
 
@@ -54,6 +71,49 @@ Game::~Game()
 	if (shadowPixelShader)
 		delete shadowPixelShader;
 
+	if (pbrPixelShader)
+		delete pbrPixelShader;
+
+	if (samplerState)
+		samplerState->Release();
+
+	if (irradianceMapTexture)
+		irradianceMapTexture->Release();
+
+	if (irradienceDepthStencil)
+		irradienceDepthStencil->Release();
+
+	if (irradienceSRV)
+		irradienceSRV->Release();
+
+	//releasing the render targets
+	for (size_t i = 0; i < 6; i++)
+	{
+		if (irradienceRTV[i])
+			irradienceRTV[i]->Release();
+	}
+
+	if (prefilteredSRV)
+		prefilteredSRV->Release();
+
+	if (prefileteredMapTexture)
+		prefileteredMapTexture->Release();
+
+	if (irradiancePS)
+		delete irradiancePS;
+
+	if (irradianceVS)
+		delete irradianceVS;
+
+	if (prefilteredMapPS)
+		delete prefilteredMapPS;
+
+	if (integrationBRDFPS)
+		delete integrationBRDFPS;
+
+	if (fullScreenTriangleVS)
+		delete fullScreenTriangleVS;
+
 	//releasing depth stencil
 	dssLessEqual->Release();
 
@@ -78,9 +138,9 @@ void Game::Init()
 	camera->CreateProjectionMatrix((float)width / height); //creating the camera projection matrix
 
 	//specifying the directional light
-	directionalLight.ambientColor = XMFLOAT4(0.1f, 0.1f ,0.1f,1.f);
+	directionalLight.ambientColor = XMFLOAT4(0.3f, 0.3f ,0.3f,1.f);
 	directionalLight.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	directionalLight.direction = XMFLOAT3(0.0f, -1.0f, 1.0f);
+	directionalLight.direction = XMFLOAT3(1.0f, -1.0f, 0.0f);
 
 	//second light
 	directionalLight2.ambientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
@@ -97,11 +157,17 @@ void Game::Init()
 
 	device->CreateDepthStencilState(&dssDesc, &dssLessEqual);
 
-
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
 	// Essentially: "What kind of shape should the GPU draw with our data?"
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	CreateIrradianceMaps();
+
+	CreatePrefilteredMaps();
+
+	CreateEnvironmentLUTs();
+
 }
 
 // --------------------------------------------------------
@@ -124,6 +190,24 @@ void Game::LoadShaders()
 
 	shadowPixelShader = new SimplePixelShader(device, context);
 	shadowPixelShader->LoadShaderFile(L"ShadowsPS.cso");
+
+	pbrPixelShader = new SimplePixelShader(device, context);
+	pbrPixelShader->LoadShaderFile(L"PBRPixelShader.cso");
+
+	irradiancePS = new SimplePixelShader(device, context);
+	irradiancePS->LoadShaderFile(L"IrradianceMapPS.cso");
+
+	irradianceVS = new SimpleVertexShader(device, context);
+	irradianceVS->LoadShaderFile(L"IrradianceMapVS.cso");
+
+	prefilteredMapPS = new SimplePixelShader(device, context);
+	prefilteredMapPS->LoadShaderFile(L"PrefilteredMapPS.cso");
+
+	integrationBRDFPS = new SimplePixelShader(device, context);
+	integrationBRDFPS->LoadShaderFile(L"IntegrationBRDFPixelShader.cso");
+
+	fullScreenTriangleVS = new SimpleVertexShader(device, context);
+	fullScreenTriangleVS->LoadShaderFile(L"FullScreenTriangleVS.cso");
 }
 
 
@@ -182,20 +266,33 @@ void Game::CreateBasicGeometry()
 
 	ID3D11ShaderResourceView* textureSRV;
 	//trying to load a texture
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldDiffuse.png",0,&textureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/CerebrusDiffuse.png",0,&textureSRV);
 
 	//trying to load a normalMap
 	ID3D11ShaderResourceView* normalTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldNormal.png", 0, &normalTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/CerebrusNormal.png", 0, &normalTextureSRV);
 
 	ID3D11ShaderResourceView* roughnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredRoughness.png", 0, &roughnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/CerebrusRoughness.png", 0, &roughnessTextureSRV);
 
 	ID3D11ShaderResourceView* metalnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GridMetallic.png", 0, &metalnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/CerebrusMetallic.png", 0, &metalnessTextureSRV);
+
+	ID3D11ShaderResourceView* goldTextureSRV;
+	//trying to load a texture
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldDiffuse.png", 0, &goldTextureSRV);
+
+	//trying to load a normalMap
+	ID3D11ShaderResourceView* goldNormalTextureSRV;
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldNormal.png", 0, &goldNormalTextureSRV);
+
+	ID3D11ShaderResourceView* goldRoughnessTextureSRV;
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldRoughness.png", 0, &goldRoughnessTextureSRV);
+
+	ID3D11ShaderResourceView* goldMetalnessTextureSRV;
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GridMetallic.png", 0, &goldMetalnessTextureSRV);
 
 	//creating a sampler state
-	ID3D11SamplerState* samplerState;
 	//sampler state description
 	D3D11_SAMPLER_DESC samplerDesc;
 	memset(&samplerDesc, 0, sizeof(samplerDesc));
@@ -208,28 +305,42 @@ void Game::CreateBasicGeometry()
 	device->CreateSamplerState(&samplerDesc, &samplerState); //creating the sampler state
 	
 	//creating a material for these entities
-	std::shared_ptr<Material> material = std::make_shared<Material>(vertexShader, pixelShader,samplerState,
+	std::shared_ptr<Material> material = std::make_shared<Material>(vertexShader, pbrPixelShader,samplerState,
 		textureSRV, normalTextureSRV,roughnessTextureSRV,metalnessTextureSRV);
 
-	std::shared_ptr<Mesh> sphere = std::make_shared<Mesh>("../../Assets/Models/cube.obj",device);
-	std::shared_ptr<Mesh> helix = std::make_shared<Mesh>("../../Assets/Models/sphere.obj", device);
-	std::shared_ptr<Mesh> object = std::make_shared<Mesh>("../../Assets/Models/helix.obj", device);
+	std::shared_ptr<Material> goldMaterial = std::make_shared<Material>(vertexShader, pbrPixelShader, samplerState,
+		goldTextureSRV, goldNormalTextureSRV, goldRoughnessTextureSRV, goldMetalnessTextureSRV);
 
+	std::shared_ptr<Mesh> cerebrus = std::make_shared<Mesh>("../../Assets/Models/cerebrus.obj",device);
+	std::shared_ptr<Mesh> object = std::make_shared<Mesh>("../../Assets/Models/cube.obj", device);
+	//std::shared_ptr<Mesh> object = std::make_shared<Mesh>("../../Assets/Models/helix.obj", device);
 
-	entities.emplace_back(std::make_shared<Entity>(sphere, material));
-	entities.emplace_back(std::make_shared<Entity>(helix, material));
-	entities.emplace_back(std::make_shared<Entity>(object, material));
+	entities.emplace_back(std::make_shared<Entity>(cerebrus, material));
+	entities.emplace_back(std::make_shared<Entity>(object, goldMaterial));
+	//entities.emplace_back(std::make_shared<Entity>(object, material));
 
 
 	auto position = entities[1]->GetPosition();
+	entities[1]->SetScale(XMFLOAT3(10, 10, 10));
 	position.x -= 0.f;
-	position.z += 2.f;
-	position.y -= 5.6f;
-	entities[0]->SetPosition(position);
-	entities[0]->SetScale(XMFLOAT3(2, 2, 2));
-	entities[0]->SetScale(XMFLOAT3(10.f, 10.f, 10.f));
+	position.z += 1.f;
+	position.y -= 7.f;
+	entities[1]->SetPosition(position);
 
-	entities[2]->SetPosition(XMFLOAT3(-2.f, 1.f, 0.f));
+	entities[0]->SetScale(XMFLOAT3(0.05f, 0.05f, 0.05f));
+	auto q1 = entities[0]->GetRotation();
+
+	auto q2 = XMQuaternionRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 3.14159f);
+
+	auto tempFinalRot =  XMQuaternionMultiply(XMLoadFloat4(&q1), q2);
+
+	XMStoreFloat4(&q1, tempFinalRot);
+
+	entities[0]->SetRotation(q1);
+	
+	//entities[0]->SetScale(XMFLOAT3(10.f, 10.f, 10.f));
+
+	//entities[2]->SetPosition(XMFLOAT3(-2.f, 1.f, 0.f));
 
 	ID3D11SamplerState* samplerStateCube;
 	//sampler state description
@@ -242,11 +353,356 @@ void Game::CreateBasicGeometry()
 
 	device->CreateSamplerState(&samplerDesc, &samplerStateCube); //creating the sampler state
 
-
 	skybox = std::make_shared<Skybox>();
 	//creating skybox
-	skybox->LoadSkybox(L"../../Assets/Textures/cubemap.dds", device, context,samplerStateCube);
+	skybox->LoadSkybox(L"../../Assets/Textures/skybox3.dds", device, context,samplerStateCube);
 
+}
+
+void Game::CreateIrradianceMaps()
+{
+	XMFLOAT4X4 cubePosxView;
+	XMFLOAT4X4 cubeNegxView;
+	XMFLOAT4X4 cubePoszView;
+	XMFLOAT4X4 cubeNegzView;
+	XMFLOAT4X4 cubePosyView;
+	XMFLOAT4X4 cubeNegyView;
+
+	//postive x face of cube
+	XMStoreFloat4x4(&cubePosxView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	cubemapViews.emplace_back(cubePosxView);
+
+	//negative x face of cube
+	XMStoreFloat4x4(&cubeNegxView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(-1.0f, 0.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	cubemapViews.emplace_back(cubeNegxView);
+
+	//postive y face of cube
+	XMStoreFloat4x4(&cubePosyView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f))));
+	cubemapViews.emplace_back(cubePosyView);
+
+	//negative y face of cube
+	XMStoreFloat4x4(&cubeNegyView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f))));
+	cubemapViews.emplace_back(cubeNegyView);
+
+	//postive z face of cube
+	XMStoreFloat4x4(&cubePoszView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	cubemapViews.emplace_back(cubePoszView);
+
+	//negative z face of cube
+	XMStoreFloat4x4(&cubeNegzView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	cubemapViews.emplace_back(cubeNegzView);
+
+	//setting the cubemap projection
+	XMStoreFloat4x4(&cubemapProj, XMMatrixTranspose(XMMatrixPerspectiveFovLH(XMConvertToRadians(90.f), 1.0f, 0.1f, 10000.f)));
+
+	//generating the irradience map
+	D3D11_TEXTURE2D_DESC irradienceTexDesc;
+	//ZeroMemory(&irradienceTexDesc, sizeof(D3D11_TEXTURE2D_DESC));
+	irradienceTexDesc.ArraySize = 6;
+	irradienceTexDesc.MipLevels = 1;
+	irradienceTexDesc.Width = 64;
+	irradienceTexDesc.Height = 64;
+	irradienceTexDesc.CPUAccessFlags = 0;
+	irradienceTexDesc.SampleDesc.Count = 1;
+	irradienceTexDesc.SampleDesc.Quality = 0;
+	irradienceTexDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	irradienceTexDesc.Usage = D3D11_USAGE_DEFAULT;
+	irradienceTexDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	irradienceTexDesc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
+
+	device->CreateTexture2D(&irradienceTexDesc, 0, &irradianceMapTexture);
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC irradienceSRVDesc;
+	ZeroMemory(&irradienceSRV, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+	irradienceSRVDesc.Format = irradienceTexDesc.Format;
+	irradienceSRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+	irradienceSRVDesc.TextureCube.MipLevels = 1;
+	irradienceSRVDesc.TextureCube.MostDetailedMip = 0;
+
+	device->CreateShaderResourceView(irradianceMapTexture, &irradienceSRVDesc, &irradienceSRV);
+
+	D3D11_RENDER_TARGET_VIEW_DESC irradianceRTVDesc;
+	ZeroMemory(&irradianceRTVDesc, sizeof(D3D11_RENDER_TARGET_VIEW_DESC));
+	//irradianceRTVDesc
+	irradianceRTVDesc.Format = irradienceTexDesc.Format;
+	irradianceRTVDesc.Texture2DArray.ArraySize = 1;
+	irradianceRTVDesc.Texture2DArray.MipSlice = 0;
+	irradianceRTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+
+	//creating viewport
+	ZeroMemory(&irradianceViewport, sizeof(D3D11_VIEWPORT));
+	irradianceViewport.Width = (float)64;
+	irradianceViewport.Height = (float)64;
+	irradianceViewport.MaxDepth = 1.0f;
+	irradianceViewport.MinDepth = 0.0f;
+	irradianceViewport.TopLeftX = 0.0f;
+	irradianceViewport.TopLeftY = 0.0f;
+
+	const float color[4] = { 0.6f, 0.6f, 0.6f, 0.0f };
+
+	UINT offset = 0;
+	UINT stride = sizeof(Vertex);
+
+	for (UINT i = 0; i < 6; i++)
+	{
+		irradianceRTVDesc.Texture2DArray.FirstArraySlice = i;
+		device->CreateRenderTargetView(irradianceMapTexture, &irradianceRTVDesc, &irradienceRTV[i]);	
+
+		context->OMSetRenderTargets(1, &irradienceRTV[i], 0);
+		context->RSSetViewports(1, &irradianceViewport);
+		context->ClearRenderTargetView(irradienceRTV[i], color);
+
+		irradianceVS->SetMatrix4x4("view", cubemapViews[i]);
+		irradianceVS->SetMatrix4x4("projection", cubemapProj);
+		irradiancePS->SetShaderResourceView("skybox", skybox->GetSkyboxTexture());
+		irradiancePS->SetSamplerState("basicSampler", samplerState);
+
+		irradiancePS->CopyAllBufferData();
+		irradianceVS->CopyAllBufferData();
+
+		irradiancePS->SetShader();
+		irradianceVS->SetShader();
+
+		auto tempVertexBuffer = skybox->GetVertexBuffer();
+		context->IASetVertexBuffers(0, 1, &tempVertexBuffer, &stride, &offset);
+		context->IASetIndexBuffer(skybox->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+
+		context->OMSetDepthStencilState(dssLessEqual, 0);
+
+		context->DrawIndexed(skybox->GetIndexCount(), 0, 0);
+
+
+	}
+
+	
+}
+
+void Game::CreatePrefilteredMaps()
+{
+
+	XMFLOAT4X4 cubePosxView;
+	XMFLOAT4X4 cubeNegxView;
+	XMFLOAT4X4 cubePoszView;
+	XMFLOAT4X4 cubeNegzView;
+	XMFLOAT4X4 cubePosyView;
+	XMFLOAT4X4 cubeNegyView;
+
+	//postive x face of cube
+	XMStoreFloat4x4(&cubePosxView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	cubemapViews.emplace_back(cubePosxView);
+
+	//negative x face of cube
+	XMStoreFloat4x4(&cubeNegxView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(-1.0f, 0.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	cubemapViews.emplace_back(cubeNegxView);
+
+	//postive y face of cube
+	XMStoreFloat4x4(&cubePosyView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f))));
+	cubemapViews.emplace_back(cubePosyView);
+
+	//negative y face of cube
+	XMStoreFloat4x4(&cubeNegyView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f))));
+	cubemapViews.emplace_back(cubeNegyView);
+
+	//postive z face of cube
+	XMStoreFloat4x4(&cubePoszView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	cubemapViews.emplace_back(cubePoszView);
+
+	//negative z face of cube
+	XMStoreFloat4x4(&cubeNegzView, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	cubemapViews.emplace_back(cubeNegzView);
+
+	//setting the cubemap projection
+	XMStoreFloat4x4(&cubemapProj, XMMatrixTranspose(XMMatrixPerspectiveFovLH(XMConvertToRadians(90.f), 1.0f, 0.1f, 10000.f)));
+
+	//creating texture 2d for prefilted map
+	D3D11_TEXTURE2D_DESC prefilteredTexDesc;
+	UINT maxMipLevel = 5;
+	prefilteredTexDesc.ArraySize = 6;
+	prefilteredTexDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+	prefilteredTexDesc.CPUAccessFlags = 0;
+	prefilteredTexDesc.Usage = D3D11_USAGE_DEFAULT;
+	prefilteredTexDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	prefilteredTexDesc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE | D3D11_RESOURCE_MISC_GENERATE_MIPS;
+	prefilteredTexDesc.MipLevels = maxMipLevel;
+	prefilteredTexDesc.Width = 128;
+	prefilteredTexDesc.Height = 128;
+	prefilteredTexDesc.SampleDesc.Count = 1;
+	prefilteredTexDesc.SampleDesc.Quality = 0;
+
+	device->CreateTexture2D(&prefilteredTexDesc, 0, &prefileteredMapTexture);
+
+	//creating shader resource
+	D3D11_SHADER_RESOURCE_VIEW_DESC prefilteredSRVDesc;
+	ZeroMemory(&prefilteredSRVDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+	prefilteredSRVDesc.Format = prefilteredTexDesc.Format;
+	prefilteredSRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+	prefilteredSRVDesc.TextureCube.MipLevels = maxMipLevel;
+	prefilteredSRVDesc.TextureCube.MostDetailedMip = 0;
+
+	device->CreateShaderResourceView(prefileteredMapTexture, &prefilteredSRVDesc, &prefilteredSRV);
+
+	const float color[4] = { 0.6f, 0.6f, 0.6f, 0.0f };
+
+	UINT offset = 0;
+	UINT stride = sizeof(Vertex);
+
+	for (size_t mip = 0; mip < maxMipLevel; mip++)
+	{
+		//each mip is sqrt times smaller than previous one
+		double width = 128 * std::pow(0.5f, mip);
+		double height = 128 * std::pow(0.5f, mip);
+
+		D3D11_RENDER_TARGET_VIEW_DESC prefilteredRTVDesc;
+		ZeroMemory(&prefilteredRTVDesc, sizeof(D3D11_RENDER_TARGET_VIEW_DESC));
+		prefilteredRTVDesc.Format = prefilteredRTVDesc.Format;
+		prefilteredRTVDesc.Texture2DArray.ArraySize = 1;
+		prefilteredRTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+		prefilteredRTVDesc.Texture2DArray.MipSlice = (UINT)mip;
+
+		D3D11_VIEWPORT currentMipViewport;
+		ZeroMemory(&currentMipViewport, sizeof(currentMipViewport));
+		currentMipViewport.Width = (float)width;
+		currentMipViewport.Height = (float)height;
+		currentMipViewport.MinDepth = 0.0f;
+		currentMipViewport.MaxDepth = 1.0f;
+		currentMipViewport.TopLeftX = 0.0f;
+		currentMipViewport.TopLeftY = 0.0f;
+
+		float roughness = float(mip) / float(maxMipLevel - 1);
+
+		for (size_t i = 0; i < 6; i++)
+		{
+			prefilteredRTVDesc.Texture2DArray.FirstArraySlice = (UINT)i;
+			device->CreateRenderTargetView(prefileteredMapTexture, &prefilteredRTVDesc, &prefilteredRTV[i]);
+
+			context->OMSetRenderTargets(1, &prefilteredRTV[i], 0);
+			context->RSSetViewports(1, &currentMipViewport);
+			context->ClearRenderTargetView(prefilteredRTV[i], color);
+
+			irradianceVS->SetMatrix4x4("view", cubemapViews[i]);
+			irradianceVS->SetMatrix4x4("projection", cubemapProj);
+			prefilteredMapPS->SetShaderResourceView("skybox", skybox->GetSkyboxTexture());
+			prefilteredMapPS->SetSamplerState("basicSampler", samplerState);
+			prefilteredMapPS->SetFloat("roughness", roughness);
+
+			prefilteredMapPS->CopyAllBufferData();
+			irradianceVS->CopyAllBufferData();
+
+			prefilteredMapPS->SetShader();
+			irradianceVS->SetShader();
+
+			auto tempVertexBuffer = skybox->GetVertexBuffer();
+			context->IASetVertexBuffers(0, 1, &tempVertexBuffer, &stride, &offset);
+			context->IASetIndexBuffer(skybox->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+
+			context->OMSetDepthStencilState(dssLessEqual, 0);
+
+			context->DrawIndexed(skybox->GetIndexCount(), 0, 0);
+
+		}
+
+		for (size_t i = 0; i < 6; i++)
+		{
+			if (prefilteredRTV[i])
+				prefilteredRTV[i]->Release();
+		}
+
+	}
+	
+}
+
+void Game::CreateEnvironmentLUTs()
+{
+
+	D3D11_TEXTURE2D_DESC integrationBrdfDesc;
+	//ZeroMemory(&irradienceTexDesc, sizeof(D3D11_TEXTURE2D_DESC));
+	integrationBrdfDesc.ArraySize = 1;
+	integrationBrdfDesc.MipLevels = 0;
+	integrationBrdfDesc.Width = 512;
+	integrationBrdfDesc.Height = 512;
+	integrationBrdfDesc.CPUAccessFlags = 0;
+	integrationBrdfDesc.SampleDesc.Count = 1;
+	integrationBrdfDesc.SampleDesc.Quality = 0;
+	integrationBrdfDesc.Format = DXGI_FORMAT_R32G32_FLOAT;
+	integrationBrdfDesc.Usage = D3D11_USAGE_DEFAULT;
+	integrationBrdfDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	integrationBrdfDesc.MiscFlags = 0;
+
+	device->CreateTexture2D(&integrationBrdfDesc, 0, &environmentBrdfTexture);
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC environmentBrdfSRVDesc;
+	ZeroMemory(&environmentBrdfSRVDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+	environmentBrdfSRVDesc.Format = integrationBrdfDesc.Format;
+	environmentBrdfSRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	environmentBrdfSRVDesc.Texture2D.MipLevels = 1;
+	environmentBrdfSRVDesc.Texture2D.MostDetailedMip = 0;
+
+	device->CreateShaderResourceView(environmentBrdfTexture, &environmentBrdfSRVDesc, &environmentBrdfSRV);
+
+	D3D11_RENDER_TARGET_VIEW_DESC enironmentBrdfRTVDesc;
+	ZeroMemory(&enironmentBrdfRTVDesc, sizeof(D3D11_RENDER_TARGET_VIEW_DESC));
+	enironmentBrdfRTVDesc.Format = integrationBrdfDesc.Format;
+	enironmentBrdfRTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+
+	device->CreateRenderTargetView(environmentBrdfTexture, &enironmentBrdfRTVDesc, &environmentBrdfRTV);
+
+	//creating a quad to render the LUT to
+	std::shared_ptr<Mesh> quad = std::make_shared<Mesh>("../../Assets/Models/quad.obj", device);
+
+	const float color[4] = { 0.6f, 0.6f, 0.6f, 0.0f };
+
+	UINT offset = 0;
+	UINT stride = sizeof(Vertex);
+
+	D3D11_VIEWPORT integrationBrdfViewport;
+	ZeroMemory(&integrationBrdfViewport, sizeof(D3D11_VIEWPORT));
+	integrationBrdfViewport.Height = 512;
+	integrationBrdfViewport.Width = 512;
+	integrationBrdfViewport.MaxDepth = 1.0f;
+	integrationBrdfViewport.MinDepth = 0.0f;
+	integrationBrdfViewport.TopLeftX = 0.0f;
+	integrationBrdfViewport.TopLeftY = 0.0f;
+
+	context->RSSetViewports(1, &integrationBrdfViewport);
+	context->OMSetRenderTargets(1, &environmentBrdfRTV, 0);
+	context->ClearRenderTargetView(environmentBrdfRTV, color);
+
+	XMFLOAT4X4 world;
+	XMStoreFloat4x4(&world, XMMatrixIdentity());
+	vertexShader->SetMatrix4x4("world", world);
+
+	XMFLOAT4X4 view;
+	XMStoreFloat4x4(&view, XMMatrixTranspose(XMMatrixLookToLH(XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+		XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f))));
+	vertexShader->SetMatrix4x4("view", view);
+
+	XMFLOAT4X4 proj;
+	XMStoreFloat4x4(&proj, XMMatrixTranspose(XMMatrixPerspectiveFovLH(XMConvertToRadians(90.f), 1.0f, 0.1f, 10000.f)));
+	vertexShader->SetMatrix4x4("projection", proj);
+
+	//vertexShader->CopyAllBufferData();
+	//vertexShader->SetShader();
+
+	integrationBRDFPS->SetShader();
+	fullScreenTriangleVS->SetShader();
+
+	//auto tempVertBuffer = quad->GetVertexBuffer();
+	//context->IASetVertexBuffers(0,1,&tempVertBuffer,&stride,&offset);
+	//context->IASetIndexBuffer(quad->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+
+	context->Draw(3, 0);
 }
 
 
@@ -372,8 +828,12 @@ void Game::Draw(float deltaTime, float totalTime)
 		entities[i]->GetMaterial()->GetPixelShader()->SetFloat3("cameraPosition",camera->GetPosition());
 
 		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("cubeMap", skybox->GetSkyboxTexture());
+		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("irradianceMap", irradienceSRV);
 		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("shadowMap", shadowSRV);
+		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("prefilteredMap", prefilteredSRV);
+		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("environmentBRDF", environmentBrdfSRV);
 		entities[i]->GetMaterial()->GetPixelShader()->SetSamplerState("shadowSampler", shadowSamplerState);
+
 		entities[i]->GetMaterial()->SetPixelShaderData();
 
 		//setting the vertex and index buffer
@@ -391,8 +851,9 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	//draw the skybox
 	skybox->PrepareSkybox(camera->GetViewMatrix(), camera->GetProjectionMatrix(), camera->GetPosition());
+	//skybox->GetPixelShader()->SetShaderResourceView("skyboxTexture", irradienceSRV);
+	//skybox->GetPixelShader()->CopyAllBufferData();
 	auto tempVertexBuffer = skybox->GetVertexBuffer();
-	auto skyboxStride = skybox->GetStride();
 	context->IASetVertexBuffers(0, 1, &tempVertexBuffer, &stride, &offset);
 	context->IASetIndexBuffer(skybox->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
 

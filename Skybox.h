@@ -44,6 +44,7 @@ public:
 	//getters
 	ID3D11Buffer* GetVertexBuffer();
 	ID3D11Buffer* GetIndexBuffer();
+	SimplePixelShader* GetPixelShader();
 	ID3D11ShaderResourceView* GetSkyboxTexture();
 	unsigned int GetIndexCount();
 	unsigned int GetStride();

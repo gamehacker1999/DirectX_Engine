@@ -91,3 +91,8 @@ unsigned int Skybox::GetStride()
 	return sizeof(SkyboxData);
 }
 
+SimplePixelShader* Skybox::GetPixelShader()
+{
+	return pixelShader;
+}
+

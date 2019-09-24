@@ -18,7 +18,7 @@ struct VertexToPixel
 	float3 tangent		: TANGENT;	//tangent of the vertex
 	float2 uv			: TEXCOORD; //uv coordinates
 	//float4 color		: COLOR;
-};\
+};
 
 //struct to desctibe the directional light
 struct DirectionalLight
@@ -85,6 +85,7 @@ float ShadowCalculation(DirectionalLight light,float2 shadowUV,float lightDepth)
 
 	shadowMap.GetDimensions(w, h);
 
+	
 	for (float j = -1.0f; j <= 1.0f; j++)
 	{
 		for (float i = -1.0f; i <= 1.0f; i++)

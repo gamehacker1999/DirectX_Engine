@@ -11,8 +11,6 @@ Material::~Material()
 {
 	if (textureSRV)
 		textureSRV->Release();
-	if (samplerState)
-		samplerState->Release();
 	if (normalTextureSRV)
 		normalTextureSRV->Release();
 	if (roughnessTextureSRV)

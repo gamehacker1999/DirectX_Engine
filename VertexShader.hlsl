@@ -47,7 +47,6 @@ struct VertexToPixel
 	//  v    v                v
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
 	float4 lightPos		: TEXCOORD1;
-	//float4 color		: COLOR;        // RGBA color
 	float3 normal		: NORMAL;		//normal of the vertex
 	float3 worldPosition: POSITION; //position of vertex in world space
 	float3 tangent		: TANGENT;	//tangent of the vertex
@@ -99,12 +98,6 @@ VertexToPixel main( VertexShaderInput input )
 	//sending the the shadow position
 	output.lightPos = mul(float4(input.position, 1.0f), lightWorldViewProj);
 
-	// Pass the color through 
-	// - The values will be interpolated per-pixel by the rasterizer
-	// - We don't need to alter it here, but we do need to send it to the pixel shader
-	//output.color = input.color;
-
-	// Whatever we return will make its way through the pipeline to the
-	// next programmable stage we're using (the pixel shader for now)
+	// Whatever we return will make its way through the pipeline to the pixel shader
 	return output;
 }

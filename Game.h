@@ -36,10 +36,16 @@ private:
 	void LoadShaders(); 
 	void CreateMatrices();
 	void CreateBasicGeometry();
+	void CreateIrradianceMaps();
+	void CreatePrefilteredMaps();
+	void CreateEnvironmentLUTs();
 
 	// Wrappers for DirectX shaders to provide simplified functionality
 	SimpleVertexShader* vertexShader;
 	SimplePixelShader* pixelShader;
+
+	//pbr pixel shader
+	SimplePixelShader* pbrPixelShader;
 
 	//vertexshader for shadows
 	SimpleVertexShader* shadowVertexShader;
@@ -59,6 +65,9 @@ private:
 	std::shared_ptr<Mesh> mesh2;
 	std::shared_ptr<Mesh> mesh3;
 
+	//sampler state for basic textures
+	ID3D11SamplerState* samplerState;
+
 	//creating a list of vectors
 	std::vector<std::shared_ptr<Entity>> entities;
 
@@ -77,6 +86,34 @@ private:
 	//depth stencil for skybox
 	ID3D11DepthStencilState* dssLessEqual;
 
+	//view and projection matrices for the irradiance map
+	std::vector<XMFLOAT4X4> cubemapViews;
+	XMFLOAT4X4 cubemapProj;
+	//textures, depth stencil, srv, and render target for irradiance map
+	ID3D11Texture2D* irradianceMapTexture;
+	ID3D11DepthStencilView* irradienceDepthStencil;
+	ID3D11ShaderResourceView* irradienceSRV;
+	ID3D11RenderTargetView* irradienceRTV[6];
+	D3D11_VIEWPORT irradianceViewport;
+
+	//texture, srv, and rtv for the prefiltered cubemap
+	ID3D11Texture2D* prefileteredMapTexture;
+	ID3D11ShaderResourceView* prefilteredSRV;
+	ID3D11RenderTargetView* prefilteredRTV[6];
+
+	//texture, rtv, and srv for environment look up texture
+	ID3D11Texture2D* environmentBrdfTexture;
+	ID3D11ShaderResourceView* environmentBrdfSRV;
+	ID3D11RenderTargetView* environmentBrdfRTV;
+
+	//vertex and pixel shader for irradience map, prefiltered map, and environment brdf
+	SimpleVertexShader* irradianceVS;
+	SimplePixelShader* irradiancePS;
+	SimplePixelShader* prefilteredMapPS;
+	SimplePixelShader* integrationBRDFPS;
+
+	//simple shader to render a full screen quad
+	SimpleVertexShader* fullScreenTriangleVS;
 
 };
 

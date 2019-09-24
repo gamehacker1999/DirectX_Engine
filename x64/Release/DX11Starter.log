@@ -1,0 +1,11 @@
+﻿C:\Users\Shubham Sachdeva\Desktop\DX11Starter\PBRPixelShader.hlsl(182,17-38): warning X3571: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+C:\Users\Shubham Sachdeva\Desktop\DX11Starter\PBRPixelShader.hlsl(283,10-31): warning X3571: pow(f, e) will not work for negative f, use abs(f) or conditionally handle negative values if you expect them
+  
+  compilation object save succeeded; see C:\Users\Shubham Sachdeva\Desktop\DX11Starter\x64\Release\PBRPixelShader.cso
+  Game.cpp
+  Generating code
+  11 of 1952 functions ( 0.6%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    4 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  DX11Starter.vcxproj -> C:\Users\Shubham Sachdeva\Desktop\DX11Starter\x64\Release\DX11Starter.exe
