@@ -1,11 +1,7 @@
 
 struct VertexToPixel
 {
-	// Data type
-	//  |
-	//  |   Name          Semantic
-	//  |    |                |
-	//  v    v                v
+
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
 	float4 lightPos		: TEXCOORD1;
 	float3 normal		: NORMAL;		//normal of the vertex
@@ -23,6 +19,24 @@ struct DirectionalLight
 	float3 direction;
 };
 
+#define LIGHT_TYPE_DIR 0
+#define LIGHT_TYPE_SPOT 1
+#define LIGHT_TYPE_POINT 2
+
+struct Light
+{
+	int type;
+	float3 direction;
+	float range;
+	float3 position;
+	float intensity;
+	float3 diffuse;
+	float spotFalloff;
+	float3 padding;
+
+};
+
+#define MAX_LIGHTS 128
 
 //constant buffer to hold light data
 cbuffer LightData: register(b0)
@@ -30,6 +44,8 @@ cbuffer LightData: register(b0)
 	DirectionalLight light;
 	DirectionalLight light2;
 	float3 cameraPosition;
+	Light lights[MAX_LIGHTS];
+	uint lightCount;
 };
 
 //textures and basic samplers
@@ -132,6 +148,61 @@ float3 CalculateDiffuse(float3 n, float3 l, float4 diffuseColor, DirectionalLigh
 	return finalLight;
 }
 
+float3 CalculateRadiance(Light light, float3 N, float3 V, float3 L, float3 R, float3 H)
+{
+	float3 Li = float3(0.0f, 0.0f, 0.0f);
+
+	//do this calculation for each light
+	float3 F = float3(0.0f, 0.0f, 0.0f);
+	float D = 0.0f;
+	float G = 0.0f;
+
+	//calculating the diffuse and specular color
+	float3 lambert;// = CalculateDiffuse(N, L, light.diffuse.xyzz, light);
+	//CookTorrence(N, H, roughness, V, f0, L, F, D, G);
+
+	float3 ks = F; //fresnel is specular term
+	float3 kd = float3(1.0f, 1.0f, 1.0f) - ks;
+	//kd *= (float3(1.0f, 1.0f, 1.0f) - metalColor);
+
+	float3 numSpec = D * F * G;
+	float denomSpec = 4.0f * max(dot(N, V), 0.0f) * max(dot(N, L), 0.0f);
+	float3 specular = numSpec / max(denomSpec, 0.0001f); //just in case denominator is zero
+
+	//Li += ((kd * surfaceColor.xyz / PI) + specular) * lambert;
+
+	return Li;
+}
+
+float3 DirectionalLightCalculations(Light light, float3 N, float3 worldPos)
+{
+	float3 c;
+
+	float3 L = -light.direction;
+	L = normalize(L); //normalizing the negated direction
+	N = normalize(N); //normalizing the normal
+
+	float3 V = normalize(cameraPosition - worldPos); //view vector
+	float3 H = normalize(L + V);
+	float3 R = reflect(-V, N); //reflect R over N
+
+	c = CalculateRadiance(light, N, V, L, R, H);
+
+	return c;
+}
+
+float3 SpotLightCalculations(Light light, float3 N, float3 worldPos)
+{
+	float3 c;
+	return c;
+}
+
+float3 PointLightCalculations(Light light, float3 N, float3 worldPos)
+{
+	float3 c;
+	return c;
+}
+
 //function to calculate diffuse color based on energy conservation	
 float3 DiffuseEnergyConserve(
 	float3 diffuse, float3 specular, float3 metalness)
@@ -179,7 +250,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	//sampling the diffuse texture
 	float4 surfaceColor = diffuseTexture.Sample(basicSampler,input.uv);
 
-	surfaceColor = pow(surfaceColor, 2.2);
+	surfaceColor = pow(abs(surfaceColor), 2.2);
 	
 	//getting the normal texture
 	float3 normalColor = normalMap.Sample(basicSampler, input.uv).xyz;
@@ -217,6 +288,18 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 V = normalize(cameraPosition - input.worldPosition); //view vector
 	float3 H = normalize(L+V);
 	float3 R = reflect(-V, N); //reflect R over N
+
+	/*for (uint i = 0; i < lightCount; i++)
+	{
+		float3 Lo = float3(0.0f, 0.0f, 0.0f);
+
+		switch (lights[i].type)
+		{
+		case LIGHT_TYPE_DIR: Lo += DirectionalLightCalculations(lights[i], N, input.worldPosition); break;
+		case LIGHT_TYPE_SPOT: Lo += SpotLightCalculations(lights[i], N, input.worldPosition); break;
+		case LIGHT_TYPE_POINT: Lo += PointLightCalculations(lights[i], N, input.worldPosition); break;
+		}
+	}*/
 
 
 	//calulating skybox reflection
@@ -278,9 +361,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	float3 ambientIndirect = (kdIndirect * diffuseIndirect + specularIndirect * surfaceColor.rgb);
 
-	float3 color = (Lo + ambientIndirect);
+	float3 color = (Lo*shadowDepth + ambientIndirect);
 
-	color = pow(color, 1.f / 2.2f);
+	float4 rimColor = float4(1.0f, 0.0f, 0.0f, 1.0f);
+	
+	color = pow(abs(color), 1.f / 2.2f);
+
+	//return lerp(rimColor, float4(color, 1.0f), float4(ksIndirect,1.0f));
 
 	return float4(color, 1.0f);
 }

@@ -43,6 +43,10 @@ Game::Game(HINSTANCE hInstance)
 
 	fullScreenTriangleVS = nullptr;
 
+	celShadingSRV = nullptr;
+
+	terrain = nullptr;
+
 	prevMousePos = { 0,0 };	
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -114,6 +118,12 @@ Game::~Game()
 	if (fullScreenTriangleVS)
 		delete fullScreenTriangleVS;
 
+	if (environmentBrdfSRV)
+		environmentBrdfSRV->Release();
+
+	if (celShadingSRV)
+		celShadingSRV->Release();
+
 	//releasing depth stencil
 	dssLessEqual->Release();
 
@@ -140,7 +150,7 @@ void Game::Init()
 	//specifying the directional light
 	directionalLight.ambientColor = XMFLOAT4(0.3f, 0.3f ,0.3f,1.f);
 	directionalLight.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	directionalLight.direction = XMFLOAT3(1.0f, -1.0f, 0.0f);
+	directionalLight.direction = XMFLOAT3(0.0f, -1.0f, 0.0f);
 
 	//second light
 	directionalLight2.ambientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
@@ -156,6 +166,9 @@ void Game::Init()
 	dssDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
 
 	device->CreateDepthStencilState(&dssDesc, &dssLessEqual);
+
+	terrain = std::make_shared<Terrain>();
+	//terrain->LoadHeightMap(device,"../../Assets/Textures/island.raw" );
 
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
@@ -266,31 +279,34 @@ void Game::CreateBasicGeometry()
 
 	ID3D11ShaderResourceView* textureSRV;
 	//trying to load a texture
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/CerebrusDiffuse.png",0,&textureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/shipDiffuse.jpg",0,&textureSRV);
 
 	//trying to load a normalMap
 	ID3D11ShaderResourceView* normalTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/CerebrusNormal.png", 0, &normalTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/shipNormal.jpg", 0, &normalTextureSRV);
 
 	ID3D11ShaderResourceView* roughnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/CerebrusRoughness.png", 0, &roughnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/shipRoughness.jpg", 0, &roughnessTextureSRV);
 
 	ID3D11ShaderResourceView* metalnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/CerebrusMetallic.png", 0, &metalnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/shipMetallic.jpg", 0, &metalnessTextureSRV);
 
 	ID3D11ShaderResourceView* goldTextureSRV;
 	//trying to load a texture
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldDiffuse.png", 0, &goldTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredDiffuse.png", 0, &goldTextureSRV);
 
 	//trying to load a normalMap
 	ID3D11ShaderResourceView* goldNormalTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldNormal.png", 0, &goldNormalTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredNormal.png", 0, &goldNormalTextureSRV);
 
 	ID3D11ShaderResourceView* goldRoughnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GoldRoughness.png", 0, &goldRoughnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredRoughness.png", 0, &goldRoughnessTextureSRV);
 
 	ID3D11ShaderResourceView* goldMetalnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/GridMetallic.png", 0, &goldMetalnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredMetallic.png", 0, &goldMetalnessTextureSRV);
+
+	//loading cel shading
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/ColorBand.jpg",0,&celShadingSRV);
 
 	//creating a sampler state
 	//sampler state description
@@ -299,7 +315,9 @@ void Game::CreateBasicGeometry()
 	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
 	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
 	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	//samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+	samplerDesc.MaxAnisotropy = 4;
 	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
 	device->CreateSamplerState(&samplerDesc, &samplerState); //creating the sampler state
@@ -311,13 +329,14 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Material> goldMaterial = std::make_shared<Material>(vertexShader, pbrPixelShader, samplerState,
 		goldTextureSRV, goldNormalTextureSRV, goldRoughnessTextureSRV, goldMetalnessTextureSRV);
 
-	std::shared_ptr<Mesh> cerebrus = std::make_shared<Mesh>("../../Assets/Models/cerebrus.obj",device);
+	std::shared_ptr<Mesh> ship = std::make_shared<Mesh>("../../Assets/Models/ship.obj",device);
 	std::shared_ptr<Mesh> object = std::make_shared<Mesh>("../../Assets/Models/cube.obj", device);
+	std::shared_ptr<Mesh> sphere = std::make_shared<Mesh>("../../Assets/Models/sphere.obj", device);
 	//std::shared_ptr<Mesh> object = std::make_shared<Mesh>("../../Assets/Models/helix.obj", device);
 
-	entities.emplace_back(std::make_shared<Entity>(cerebrus, material));
+	entities.emplace_back(std::make_shared<Entity>(ship, material));
 	entities.emplace_back(std::make_shared<Entity>(object, goldMaterial));
-	//entities.emplace_back(std::make_shared<Entity>(object, material));
+	entities.emplace_back(std::make_shared<Entity>(sphere, goldMaterial));
 
 
 	auto position = entities[1]->GetPosition();
@@ -327,7 +346,7 @@ void Game::CreateBasicGeometry()
 	position.y -= 7.f;
 	entities[1]->SetPosition(position);
 
-	entities[0]->SetScale(XMFLOAT3(0.05f, 0.05f, 0.05f));
+	entities[0]->SetScale(XMFLOAT3(0.5f, 0.5f, 0.5f));
 	auto q1 = entities[0]->GetRotation();
 
 	auto q2 = XMQuaternionRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 3.14159f);
@@ -336,7 +355,11 @@ void Game::CreateBasicGeometry()
 
 	XMStoreFloat4(&q1, tempFinalRot);
 
-	entities[0]->SetRotation(q1);
+	//entities[0]->SetRotation(q1);
+
+	auto spherePos = entities[2]->GetPosition();
+	spherePos.x -= 2;
+	entities[2]->SetPosition(spherePos);
 	
 	//entities[0]->SetScale(XMFLOAT3(10.f, 10.f, 10.f));
 
@@ -355,7 +378,7 @@ void Game::CreateBasicGeometry()
 
 	skybox = std::make_shared<Skybox>();
 	//creating skybox
-	skybox->LoadSkybox(L"../../Assets/Textures/skybox3.dds", device, context,samplerStateCube);
+	skybox->LoadSkybox(L"../../Assets/Textures/skybox1.dds", device, context,samplerStateCube);
 
 }
 
@@ -703,6 +726,9 @@ void Game::CreateEnvironmentLUTs()
 	//context->IASetIndexBuffer(quad->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
 
 	context->Draw(3, 0);
+
+	environmentBrdfRTV->Release();
+	environmentBrdfTexture->Release();
 }
 
 
@@ -828,6 +854,7 @@ void Game::Draw(float deltaTime, float totalTime)
 		entities[i]->GetMaterial()->GetPixelShader()->SetFloat3("cameraPosition",camera->GetPosition());
 
 		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("cubeMap", skybox->GetSkyboxTexture());
+		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("celShading", celShadingSRV);
 		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("irradianceMap", irradienceSRV);
 		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("shadowMap", shadowSRV);
 		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("prefilteredMap", prefilteredSRV);
@@ -848,6 +875,22 @@ void Game::Draw(float deltaTime, float totalTime)
 	}
 
 	context->OMSetDepthStencilState(dssLessEqual, 0);
+
+	//drawing the terrain
+	/*vertexShader->SetMatrix4x4("world", terrain->GetWorldMatrix());
+	vertexShader->SetMatrix4x4("view", camera->GetViewMatrix());
+	vertexShader->SetMatrix4x4("projection", camera->GetProjectionMatrix());
+	pixelShader->SetData("light", &directionalLight, sizeof(DirectionalLight)); //adding directional lights to the scene
+
+	vertexShader->CopyAllBufferData();
+	pixelShader->CopyAllBufferData();
+	vertexShader->SetShader();
+	pixelShader->SetShader();
+
+	auto tempTerrainVB = terrain->GetVertexBuffer();
+	context->IASetVertexBuffers(0, 1, &tempTerrainVB, &stride, &offset);
+	context->IASetIndexBuffer(terrain->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+	context->DrawIndexed(511 * 511 * 2*3, 0, 0);*/
 
 	//draw the skybox
 	skybox->PrepareSkybox(camera->GetViewMatrix(), camera->GetProjectionMatrix(), camera->GetPosition());

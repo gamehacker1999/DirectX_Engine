@@ -9,3 +9,20 @@ struct DirectionalLight
 	XMFLOAT3 direction;
 };
 
+#define LIGHT_TYPE_DIR 0
+#define LIGHT_TYPE_SPOT 1
+#define LIGHT_TYPE_POINT 2
+
+struct Light
+{
+	int type;
+	XMFLOAT3 direction;
+	float range;
+	XMFLOAT3 position;
+	float intensity;
+	XMFLOAT3 diffuse;
+	float spotFalloff;
+	XMFLOAT3 padding;
+
+};
+

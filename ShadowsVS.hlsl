@@ -8,11 +8,6 @@ cbuffer externalData: register(b0)
 
 struct VertexShaderInput
 {
-	// Data type
-	//  |
-	//  |   Name          Semantic
-	//  |    |                |
-	//  v    v                v
 	float3 position		: POSITION;     // XYZ position
 	//float4 color		: COLOR;        // RGBA color
 	float3 normal		: NORMAL;		//Normal of the vertex

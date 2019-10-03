@@ -147,6 +147,7 @@
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="SimpleShader.cpp" />
     <ClCompile Include="Skybox.cpp" />
+    <ClCompile Include="Terrain.cpp" />
     <ClCompile Include="Textures.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -162,6 +163,7 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="SimpleShader.h" />
     <ClInclude Include="Skybox.h" />
+    <ClInclude Include="Terrain.h" />
     <ClInclude Include="Textures.h" />
     <ClInclude Include="Vertex.h" />
   </ItemGroup>

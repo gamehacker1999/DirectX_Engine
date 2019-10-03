@@ -1,16 +1,7 @@
 
 // Struct representing the data we expect to receive from earlier pipeline stages
-// - Should match the output of our corresponding vertex shader
-// - The name of the struct itself is unimportant
-// - The variable names don't have to match other shaders (just the semantics)
-// - Each variable must have a semantic, which defines its usage
 struct VertexToPixel
 {
-	// Data type
-	//  |
-	//  |   Name          Semantic
-	//  |    |                |
-	//  v    v                v
 	float4 position		: SV_POSITION;
 	float4 lightPos		: TEXCOORD1;
 	float3 normal		: NORMAL;
@@ -45,6 +36,7 @@ SamplerComparisonState shadowSampler: register(s1);
 Texture2D normalMap : register(t1);
 TextureCube cubeMap: register(t2);
 Texture2D shadowMap	: register(t3);
+Texture1D celShading: register(t4);
 
 //function that accepts light and normal and then calculates the final color
 float4 CalculateLight(DirectionalLight light, float3 normal, VertexToPixel input)
@@ -56,16 +48,21 @@ float4 CalculateLight(DirectionalLight light, float3 normal, VertexToPixel input
 	N = normalize(N); //normalizing the normal
 	float3 R = reflect(-L,N); //reflect R over N
 	float3 V = normalize(cameraPosition - input.worldPosition); //view vector
+	float4 NdotV = saturate(dot(N, V));
+	float4 rimColor = float4(0.0f, 0.0f, 1.0f, 1.0f);
 
 	//calculate the cosine of the angle to calculate specularity
 	//I am calculating the light based on the phong reflection model
 	float cosine = dot(R, V);
 	cosine = saturate(cosine);
-	float shininess = 4;
-	float specularAmount = pow(cosine, shininess);
+	float shininess = 64.f;
+	float specularAmount = pow(cosine, shininess); //increase the cosine curve fall off
 
 	float NdotL = dot(N, L);
 	NdotL = saturate(NdotL); //this is the light amount, we need to clamp it to 0 and 1.0
+
+	float4 diffuse = celShading.Sample(basicSampler, NdotL);
+	//return diffuse;
 
 	//adding diffuse, ambient, and specular color
 	float4 finalLight = light.diffuse * NdotL;
@@ -98,23 +95,9 @@ float ShadowCalculation(DirectionalLight light,float2 shadowUV,float lightDepth)
 	return (shadowDepth / 9.0f);
 }
 
-
-// --------------------------------------------------------
-// The entry point (main method) for our pixel shader
-// 
-// - Input is the data coming down the pipeline (defined by the struct)
-// - Output is a single color (float4)
-// - Has a special semantic (SV_TARGET), which means 
-//    "put the output of this into the current render target"
-// - Named "main" because that's the default the shader compiler looks for
 // --------------------------------------------------------
 float4 main(VertexToPixel input) : SV_TARGET
 {
-	// Just return the input color
-	// - This color (like most values passing through the rasterizer) is 
-	//   interpolated for each pixel between the corresponding vertices 
-	//   of the triangle we're rendering
-	//return input.color;
 
 	float3 normalColor = normalMap.Sample(basicSampler,input.uv).xyz;
 	float3 unpackedNormal = normalColor * 2.0f - 1.0f;
@@ -151,6 +134,14 @@ float4 main(VertexToPixel input) : SV_TARGET
 	//read shadow map for closest surface
 	float shadowDepth = ShadowCalculation(light, shadowUV, lightDepth);
 
+	float3 V = normalize(cameraPosition - input.worldPosition); //view vector
+	float NdotV = saturate(dot(finalNormal, V));
+	float4 rimColor = float4(0.0f, 0.0f, 1.0f, 1.0f);
+
+	float4 finalColor = ((CalculateLight(light, finalNormal, input) * shadowDepth) + light.ambientColor) * surfaceColor;
+
+	//return lerp(rimColor, finalColor, NdotV);
+
 	//return shadowDepth;
-	return ((CalculateLight(light,finalNormal,input)*shadowDepth)+light.ambientColor)*surfaceColor;
+	return ((CalculateLight(light,input.normal,input)*shadowDepth)+light.ambientColor)*surfaceColor;
 }

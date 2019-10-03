@@ -10,6 +10,7 @@
 #include"Lights.h"
 #include"Skybox.h"
 #include"Textures.h"
+#include"Terrain.h"
 class Game 
 	: public DXCore
 {
@@ -71,8 +72,14 @@ private:
 	//creating a list of vectors
 	std::vector<std::shared_ptr<Entity>> entities;
 
+	//list of lights
+	std::vector<Light> lights;
+
 	//camera
 	std::shared_ptr<Camera> camera;
+
+	//terrain
+	std::shared_ptr<Terrain> terrain;
 
 	//creating a directional light
 	DirectionalLight directionalLight;
@@ -114,6 +121,9 @@ private:
 
 	//simple shader to render a full screen quad
 	SimpleVertexShader* fullScreenTriangleVS;
+
+	//1d texture color band
+	ID3D11ShaderResourceView* celShadingSRV;
 
 };
 
