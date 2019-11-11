@@ -6,6 +6,7 @@ using namespace DirectX;
 //class to represent the a movable camera
 class Camera
 {
+protected:
 	//fields for the class
 	//view and projection matrices
 	XMFLOAT4X4 viewMatrix;
@@ -22,6 +23,7 @@ class Camera
 
 public:
 	Camera(XMFLOAT3 position, XMFLOAT3 direction, XMFLOAT3 up = XMFLOAT3(0.0f,1.0f,0.0f));
+	virtual ~Camera();
 
 	//getters and setters
 	XMFLOAT4X4 GetViewMatrix();
@@ -29,6 +31,9 @@ public:
 
 	//method to create projection matrix
 	void CreateProjectionMatrix(float aspectRatio);
+
+	//create view matrix
+	void SetPositionTargetAndUp(XMFLOAT3 position, XMFLOAT3 direction, XMFLOAT3 up = XMFLOAT3(0.0f, 1.0f, 0.0f));
 
 	//function to get keyboard input
 	void ManageKeyboard(float deltaTime);
@@ -38,8 +43,9 @@ public:
 
 	//getters
 	XMFLOAT3 GetPosition();
+	XMFLOAT3 GetDirection();
 
 	//method to update the camera
-	void Update(float deltaTime);
+	virtual void Update(float deltaTime);
 };
 

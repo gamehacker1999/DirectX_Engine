@@ -106,7 +106,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 N = normalize(input.normal);
 	float3 T = input.tangent - dot(input.tangent, N) * N;
 	T = normalize(T);
-	float3 B = normalize(cross(N,T));
+	float3 B = normalize(cross(T,N));
 
 	float3x3 TBN = float3x3(T, B, N); //getting the tbn matrix
 
@@ -139,8 +139,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float4 rimColor = float4(0.0f, 0.0f, 1.0f, 1.0f);
 
 	float4 finalColor = ((CalculateLight(light, finalNormal, input) * shadowDepth) + light.ambientColor) * surfaceColor;
-
-	//return lerp(rimColor, finalColor, NdotV);
 
 	//return shadowDepth;
 	return ((CalculateLight(light,input.normal,input)*shadowDepth)+light.ambientColor)*surfaceColor;

@@ -40,11 +40,11 @@ void Terrain::LoadHeightMap(ID3D11Device* device, std::string filename)
 	{
 		for (size_t i = 0; i < 512; i++)
 		{
-			int index = (j * 512) + i;
+			size_t index = (j * 512) + i;
 			XMFLOAT3 position;
 			position.x = (float)i;
 			position.z = (float)j;
-			position.y = (float)rawHeights[k]/25.0f;
+			position.y = (float)rawHeights[k]/255.0f;
 
 			heightmap[index] = position;
 
@@ -71,14 +71,14 @@ void Terrain::LoadHeightMap(ID3D11Device* device, std::string filename)
 	std::vector<unsigned int> indices((size_t)numTriangles*3);
 
 	k = 0;
-	int textureU = 0;
-	int textureV = 0;
+	float textureU = 0;
+	float textureV = 0;
 
-	for (size_t i = 0; i < 511; i++)
+	for (unsigned int i = 0; i < 511; i++)
 	{
-		for (size_t j = 0; j < 511; j++)
+		for (unsigned int j = 0; j < 511; j++)
 		{
-			indices[k+5] = i * 512 + j; //bottom left of quad
+			indices[(size_t)k+5] = i * 512 + j; //bottom left of quad
 			vertices[i * 512 + j].uv = XMFLOAT2(textureU, textureV + 1.0f);
 
 			indices[(size_t)k + 4] = i * 512 + j + 1; //bottom right of quad

@@ -30,7 +30,7 @@ public:
 
 	//material for loading textures
 	Material(SimpleVertexShader* vertexShader, SimplePixelShader* pixelShader,
-		ID3D11SamplerState* samplerState, ID3D11ShaderResourceView* textureSRV,
+		ID3D11SamplerState* samplerState, ID3D11ShaderResourceView* textureSRV=nullptr,
 		ID3D11ShaderResourceView* normalTextureSRV=nullptr, ID3D11ShaderResourceView* roughnessTextureSRV = nullptr,
 		ID3D11ShaderResourceView* metalnessTextureSRV = nullptr);
 

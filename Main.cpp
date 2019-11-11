@@ -1,7 +1,7 @@
-
+#define _CRTDBG_MAP_ALLOC
 #include <Windows.h>
 #include "Game.h"
-
+#include<crtdbg.h>
 // --------------------------------------------------------
 // Entry point for a graphical (non-console) Windows application
 // --------------------------------------------------------

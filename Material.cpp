@@ -9,14 +9,6 @@ Material::Material(SimpleVertexShader* vertexShader, SimplePixelShader* pixelSha
 
 Material::~Material()
 {
-	if (textureSRV)
-		textureSRV->Release();
-	if (normalTextureSRV)
-		normalTextureSRV->Release();
-	if (roughnessTextureSRV)
-		roughnessTextureSRV->Release();
-	if (metalnessTextureSRV)
-		metalnessTextureSRV->Release();
 }
 
 Material::Material(SimpleVertexShader* vertexShader, SimplePixelShader* pixelShader, 

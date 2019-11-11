@@ -1,5 +1,4 @@
 #pragma once
-
 #include <Windows.h>
 #include <d3d11.h>
 #include <string>
@@ -7,6 +6,7 @@
 // We can include the correct library files here
 // instead of in Visual Studio settings if we want
 #pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "assimp-vc140-mt.lib")
 
 class DXCore
 {
@@ -70,14 +70,7 @@ protected:
 	ID3D11RenderTargetView* backBufferRTV;
 	ID3D11DepthStencilView* depthStencilView;
 
-	//variables related to the shadow mapping depth buffer
-	ID3D11DepthStencilView* shadowDepthStencil;
-	ID3D11Texture2D* shadowMapTexture = nullptr;
-	ID3D11ShaderResourceView* shadowSRV;
-	D3D11_VIEWPORT shadowViewport;
-	ID3D11RasterizerState* shadowRasterizerState;
-	ID3D11SamplerState* shadowSamplerState;
-
+	ID3D11Debug* debug;
 
 	// Helper function for allocating a console window
 	void CreateConsoleWindow(int bufferLines, int bufferColumns, int windowLines, int windowColumns);

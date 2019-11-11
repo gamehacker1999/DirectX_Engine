@@ -42,6 +42,96 @@ Mesh::Mesh(Vertex* vertices, unsigned int numVertices, unsigned int* indices, in
 }
 
 Mesh::Mesh(std::string fileName, ID3D11Device* device)
+{	
+	vertexBuffer = nullptr;
+	indexBuffer = nullptr;
+	numIndices = 0;
+
+	if (fileName.find(".fbx") != std::string::npos)
+	{
+		LoadFBX(device, fileName);
+	}
+
+	else if (fileName.find(".obj") != std::string::npos)
+	{
+		LoadOBJ(device,fileName);
+	}
+
+}
+
+void Mesh::CalculateTangents(std::vector<Vertex>& vertices, std::vector<XMFLOAT3>& position,
+	std::vector<XMFLOAT2>& uvs,unsigned int vertCount)
+{
+	//compute the tangents and bitangents for each triangle
+	for (size_t i = 0; i < vertCount; i+=3)
+	{
+		//getting the position, normal, and uv data for vertex
+		XMFLOAT3 vert1 = vertices[i].Position;
+		XMFLOAT3 vert2 = vertices[i+1].Position;
+		XMFLOAT3 vert3 = vertices[i+2].Position;
+
+		XMFLOAT2 uv1 = vertices[i].uv;
+		XMFLOAT2 uv2 = vertices[i+1].uv;
+		XMFLOAT2 uv3 = vertices[i+2].uv;
+
+		//finding the two edges of the triangles
+		auto tempEdge = XMLoadFloat3(&vert2)-XMLoadFloat3(&vert1);
+		XMFLOAT3 edge1;
+		XMStoreFloat3(&edge1, tempEdge);
+		tempEdge = XMLoadFloat3(&vert3) - XMLoadFloat3(&vert1);
+		XMFLOAT3 edge2;
+		XMStoreFloat3(&edge2, tempEdge);
+
+		//finding the difference in UVs
+		XMFLOAT2 deltaUV1;
+		XMStoreFloat2(&deltaUV1, XMLoadFloat2(&uv2) - XMLoadFloat2(&uv1));
+		XMFLOAT2 deltaUV2;
+		XMStoreFloat2(&deltaUV2, XMLoadFloat2(&uv3) - XMLoadFloat2(&uv1));
+
+		//calculate the inverse of the delta uv matrix
+		float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+		//calculating the tangent of the triangle
+		XMFLOAT3 tangent; 
+		XMStoreFloat3(&tangent, (XMLoadFloat3(&edge1) * deltaUV2.y - XMLoadFloat3(&edge2) * deltaUV1.y )*r);
+
+		vertices[i].tangent = tangent;
+		vertices[i + 1].tangent = tangent;
+		vertices[i + 2].tangent = tangent;
+
+	}
+}
+
+Mesh::~Mesh()
+{
+	//releasing the vertex and index buffer
+	if(vertexBuffer)
+		vertexBuffer->Release();
+
+	if(indexBuffer)
+		indexBuffer->Release();
+}
+
+ID3D11Buffer* Mesh::GetVertexBuffer()
+{
+	return vertexBuffer;
+}
+
+ID3D11Buffer* Mesh::GetIndexBuffer()
+{
+	return indexBuffer;
+}
+
+unsigned int Mesh::GetIndexCount()
+{
+	return numIndices;
+}
+
+std::vector<XMFLOAT3> Mesh::GetPoints()
+{
+	return points;
+}
+
+void Mesh::LoadOBJ(ID3D11Device* device,std::string& fileName)
 {
 	std::ifstream ifile(fileName.c_str());
 
@@ -121,10 +211,10 @@ Mesh::Mesh(std::string fileName, ID3D11Device* device)
 					curPos = 0;
 
 					//splitting each vertex further to seperate it based on a '/' character
-					while (pos <= words[i + 1].length())
+					while (pos <= words[(size_t)i + 1].length())
 					{
-						(pos = words[i + 1].find("/", curPos));
-						std::string word = words[i + 1].substr(curPos, pos - curPos);
+						(pos = words[(size_t)i + 1].find("/", curPos));
+						std::string word = words[(size_t)i + 1].substr(curPos, pos - curPos);
 						curPos = pos + 1;
 						face.emplace_back(word);
 					}
@@ -135,21 +225,21 @@ Mesh::Mesh(std::string fileName, ID3D11Device* device)
 
 				//first vertex
 				Vertex v1;
-				v1.Position = positions[std::stoi(listOfFaces[0][0]) - 1];
-				v1.normal = normals[std::stoi(listOfFaces[0][2]) - 1];
-				v1.uv = uvs[std::stoi(listOfFaces[0][1]) - 1];
+				v1.Position = positions[(size_t)std::stoi(listOfFaces[0][0]) - 1];
+				v1.normal = normals[(size_t)std::stoi(listOfFaces[0][2]) - 1];
+				v1.uv = uvs[(size_t)std::stoi(listOfFaces[0][1]) - 1];
 
 				//second vertex
 				Vertex v2;
-				v2.Position = positions[std::stoi(listOfFaces[1][0]) - 1];
-				v2.normal = normals[std::stoi(listOfFaces[1][2]) - 1];
-				v2.uv = uvs[std::stoi(listOfFaces[1][1]) - 1];
+				v2.Position = positions[(size_t)std::stoi(listOfFaces[1][0]) - 1];
+				v2.normal = normals[(size_t)std::stoi(listOfFaces[1][2]) - 1];
+				v2.uv = uvs[(size_t)std::stoi(listOfFaces[1][1]) - 1];
 
 				//third vertex
 				Vertex v3;
-				v3.Position = positions[std::stoi(listOfFaces[2][0]) - 1];
-				v3.normal = normals[std::stoi(listOfFaces[2][2]) - 1];
-				v3.uv = uvs[std::stoi(listOfFaces[2][1]) - 1];
+				v3.Position = positions[(size_t)std::stoi(listOfFaces[2][0]) - 1];
+				v3.normal = normals[(size_t)std::stoi(listOfFaces[2][2]) - 1];
+				v3.uv = uvs[(size_t)std::stoi(listOfFaces[2][1]) - 1];
 
 				//since the texture space starts at top left, it its probably upside down
 				v1.uv.y = 1 - v1.uv.y;
@@ -182,9 +272,9 @@ Mesh::Mesh(std::string fileName, ID3D11Device* device)
 				{
 					//fourth vertex
 					Vertex v4;
-					v4.Position = positions[std::stoi(listOfFaces[3][0]) - 1];
-					v4.normal = normals[std::stoi(listOfFaces[3][2]) - 1];
-					v4.uv = uvs[std::stoi(listOfFaces[3][1]) - 1];
+					v4.Position = positions[(size_t)std::stoi(listOfFaces[3][0]) - 1];
+					v4.normal = normals[(size_t)std::stoi(listOfFaces[3][2]) - 1];
+					v4.uv = uvs[(size_t)std::stoi(listOfFaces[3][1]) - 1];
 
 					//do the same handedness conversion
 					v4.Position.z *= -1;
@@ -204,12 +294,13 @@ Mesh::Mesh(std::string fileName, ID3D11Device* device)
 				}
 			}
 
+
 		}
 
 		CalculateTangents(vertices, positions, uvs, vertCount);
+		points = positions;
 
 		numIndices = vertCount;
-
 		//create the vertex and index buffer
 		//vertexBuffer
 		D3D11_BUFFER_DESC vbd;
@@ -240,74 +331,17 @@ Mesh::Mesh(std::string fileName, ID3D11Device* device)
 	}
 }
 
-void Mesh::CalculateTangents(std::vector<Vertex>& vertices, std::vector<XMFLOAT3>& position,
-	std::vector<XMFLOAT2>& uvs,unsigned int vertCount)
+void Mesh::Draw(ID3D11DeviceContext* context)
 {
-	//compute the tangents and bitangents for each triangle
-	for (size_t i = 0; i < vertCount; i+=3)
-	{
-		//getting the position, normal, and uv data for vertex
-		XMFLOAT3 vert1 = vertices[i].Position;
-		XMFLOAT3 vert2 = vertices[i+1].Position;
-		XMFLOAT3 vert3 = vertices[i+2].Position;
-
-		XMFLOAT2 uv1 = vertices[i].uv;
-		XMFLOAT2 uv2 = vertices[i+1].uv;
-		XMFLOAT2 uv3 = vertices[i+2].uv;
-
-		//finding the two edges of the triangles
-		auto tempEdge = XMLoadFloat3(&vert2)-XMLoadFloat3(&vert1);
-		XMFLOAT3 edge1;
-		XMStoreFloat3(&edge1, tempEdge);
-		tempEdge = XMLoadFloat3(&vert3) - XMLoadFloat3(&vert1);
-		XMFLOAT3 edge2;
-		XMStoreFloat3(&edge2, tempEdge);
-
-		//finding the difference in UVs
-		XMFLOAT2 deltaUV1;
-		XMStoreFloat2(&deltaUV1, XMLoadFloat2(&uv2) - XMLoadFloat2(&uv1));
-		XMFLOAT2 deltaUV2;
-		XMStoreFloat2(&deltaUV2, XMLoadFloat2(&uv3) - XMLoadFloat2(&uv1));
-
-		//calculate the inverse of the delta uv matrix
-		float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
-		//calculating the tangent of the triangle
-		XMFLOAT3 tangent; 
-		XMStoreFloat3(&tangent, (XMLoadFloat3(&edge1) * deltaUV2.y - XMLoadFloat3(&edge2) * deltaUV1.y )*r);
-
-		vertices[i].tangent = tangent;
-		vertices[i + 1].tangent = tangent;
-		vertices[i + 2].tangent = tangent;
-
-	}
 }
 
-Mesh::~Mesh()
+void Mesh::LoadFBX(ID3D11Device* device, std::string& filename)
 {
-	//releasing the vertex and index buffer
-	if(vertexBuffer)
-		vertexBuffer->Release();
+	Assimp::Importer importer;
 
-	if(indexBuffer)
-		indexBuffer->Release();
-}
+	const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_ConvertToLeftHanded);
 
-ID3D11Buffer* Mesh::GetVertexBuffer()
-{
-	return vertexBuffer;
-}
+	aiNode* node = scene->mRootNode;
 
-ID3D11Buffer* Mesh::GetIndexBuffer()
-{
-	return indexBuffer;
-}
-
-unsigned int Mesh::GetIndexCount()
-{
-	return numIndices;
-}
-
-void Mesh::LoadOBJ(std::string fileName)
-{
-
+	//aiMesh* mesh = scene->mMeshes[node->mMeshes[0]];
 }

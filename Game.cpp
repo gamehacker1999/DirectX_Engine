@@ -47,6 +47,12 @@ Game::Game(HINSTANCE hInstance)
 
 	terrain = nullptr;
 
+	blendState = nullptr;
+
+	backCullRS = nullptr;
+
+	skyRS = nullptr;
+
 	prevMousePos = { 0,0 };	
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -124,6 +130,56 @@ Game::~Game()
 	if (celShadingSRV)
 		celShadingSRV->Release();
 
+	if (particleBlendState)
+		particleBlendState->Release();
+
+	if (blendState)
+		blendState->Release();
+
+	if (backCullRS)
+		backCullRS->Release();
+
+	if (skyRS)
+		skyRS->Release();
+
+	if (particlePS)
+		delete particlePS;
+
+	if (particleVS)
+		delete particleVS;
+
+	if (particleTexture)
+		particleTexture->Release();
+
+	if (shadowDepthStencil) shadowDepthStencil->Release();
+	if (shadowMapTexture) shadowMapTexture->Release();
+	if (shadowRasterizerState) { shadowRasterizerState->Release(); }
+	if (shadowSamplerState) { shadowSamplerState->Release(); }
+	if (shadowSRV) shadowSRV->Release();
+
+
+	textureSRV->Release();
+	//trying to load a texture
+
+	//trying to load a normalMap
+	normalTextureSRV->Release();
+
+	roughnessTextureSRV->Release();
+
+	metalnessTextureSRV->Release();
+
+	goldTextureSRV->Release();
+	//trying to load a texture
+
+	//trying to load a normalMap
+	goldNormalTextureSRV->Release();
+
+	goldRoughnessTextureSRV->Release();
+
+	goldMetalnessTextureSRV->Release();
+
+	waterDiffuse->Release();
+
 	//releasing depth stencil
 	dssLessEqual->Release();
 
@@ -139,11 +195,10 @@ void Game::Init()
 	// geometry to draw and some simple camera matrices.
 	//  - You'll be expanding and/or replacing these later
 	LoadShaders();
-	CreateMatrices();
 	CreateBasicGeometry();
 
 	//initalizing camera
-	camera = std::make_shared<Camera>(XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	camera = std::make_shared<Camera>(XMFLOAT3(0.0f, 3.5f, -18.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
 
 	camera->CreateProjectionMatrix((float)width / height); //creating the camera projection matrix
 
@@ -157,6 +212,16 @@ void Game::Init()
 	directionalLight2.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	directionalLight2.direction = XMFLOAT3(-1.0f, -1.0f, 1.0f);
 
+	XMFLOAT3 worldOrigin = XMFLOAT3(0.f, 0.f, 0.f);
+	lights[0] = {};
+	lights[0].type = LIGHT_TYPE_DIR;
+	lights[0].direction = XMFLOAT3(0.0f, -1.0f, 1.0f);
+	lights[0].diffuse = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	XMFLOAT3 lightDir1Pos;
+	XMStoreFloat3(&lightDir1Pos, XMLoadFloat3(&worldOrigin) - XMLoadFloat3(&lights[0].direction) * 100);
+	lights[0].position = lightDir1Pos;
+	lights[0].range = 10.f;
+
 	//setting depth stencil for skybox;
 		//depth stencil state for skybox
 	D3D11_DEPTH_STENCIL_DESC dssDesc;
@@ -167,8 +232,118 @@ void Game::Init()
 
 	device->CreateDepthStencilState(&dssDesc, &dssLessEqual);
 
-	terrain = std::make_shared<Terrain>();
-	//terrain->LoadHeightMap(device,"../../Assets/Textures/island.raw" );
+	//creating a blend state
+	D3D11_BLEND_DESC blendDesc = {};
+	blendDesc.AlphaToCoverageEnable = false;
+	blendDesc.IndependentBlendEnable = false;
+	blendDesc.RenderTarget[0].BlendEnable = true;;
+	blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].SrcBlendAlpha=D3D11_BLEND_ONE;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+	blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+	device->CreateBlendState(&blendDesc, &blendState);
+
+	D3D11_BLEND_DESC blend = {};
+	blend.AlphaToCoverageEnable = false;
+	blend.IndependentBlendEnable = false;
+	blend.RenderTarget[0].BlendEnable = true;
+	blend.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+	blend.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA; // Still respect pixel shader output alpha
+	blend.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+	blend.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	blend.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+	blend.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+	blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	device->CreateBlendState(&blend, &particleBlendState);
+
+	D3D11_DEPTH_STENCIL_DESC dsDesc = {};
+	dsDesc.DepthEnable = true;
+	dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO; // Turns off depth writing
+	dsDesc.DepthFunc = D3D11_COMPARISON_LESS;
+	device->CreateDepthStencilState(&dsDesc, &particleDepth);
+
+	//description of the shadow mapping depth buffer
+	D3D11_TEXTURE2D_DESC shadowMapDesc;
+	ZeroMemory(&shadowMapDesc, sizeof(D3D11_TEXTURE2D_DESC));
+	shadowMapDesc.Width = 1024;
+	shadowMapDesc.Height = 1024;
+	shadowMapDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+	shadowMapDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+	shadowMapDesc.ArraySize = 1;
+	shadowMapDesc.MipLevels = 1;
+	shadowMapDesc.CPUAccessFlags = 0;
+	shadowMapDesc.MiscFlags = 0;
+	shadowMapDesc.SampleDesc.Count = 1;
+	shadowMapDesc.SampleDesc.Quality = 0;
+	shadowMapDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	//creating a texture
+	device->CreateTexture2D(&shadowMapDesc, nullptr, &shadowMapTexture);
+
+	//description for depth stencil view
+	D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
+	ZeroMemory(&depthStencilViewDesc, sizeof(D3D11_DEPTH_STENCIL_VIEW_DESC));
+	depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	depthStencilViewDesc.Texture2D.MipSlice = 0;
+	depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+
+	device->CreateDepthStencilView(shadowMapTexture, &depthStencilViewDesc, &shadowDepthStencil);
+
+	//creating a shader resource view
+	D3D11_SHADER_RESOURCE_VIEW_DESC shadowSRVDesc;
+	ZeroMemory(&shadowSRVDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+	shadowSRVDesc.Format = DXGI_FORMAT_R32_FLOAT;
+	shadowSRVDesc.Texture2D.MipLevels = 1;
+	shadowSRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+
+	device->CreateShaderResourceView(shadowMapTexture, &shadowSRVDesc, &shadowSRV);
+
+	//setting up the shadow viewport
+	ZeroMemory(&shadowViewport, sizeof(D3D11_VIEWPORT));
+	shadowViewport.Width = 1024.0f;
+	shadowViewport.Height = 1024.0f;
+	shadowViewport.MinDepth = 0.0f;
+	shadowViewport.MaxDepth = 1.0f;
+	shadowViewport.TopLeftX = 0.0f;
+	shadowViewport.TopLeftY = 0.0f;
+
+	//rasterizer for pixel shader
+	D3D11_RASTERIZER_DESC shadowRasterizerDesc;
+	ZeroMemory(&shadowRasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
+	shadowRasterizerDesc.FillMode = D3D11_FILL_SOLID;
+	shadowRasterizerDesc.CullMode = D3D11_CULL_BACK;
+	shadowRasterizerDesc.DepthClipEnable = true;
+	shadowRasterizerDesc.FrontCounterClockwise = false;
+	shadowRasterizerDesc.DepthBias = 1000;
+	shadowRasterizerDesc.DepthBiasClamp = 0.0f;
+	shadowRasterizerDesc.SlopeScaledDepthBias = 1.0f;
+
+	//creating this rasterizer
+	device->CreateRasterizerState(&shadowRasterizerDesc, &shadowRasterizerState);
+
+	//sampler for the shadow texture
+	D3D11_SAMPLER_DESC shadowSamplerDesc;
+	memset(&shadowSamplerDesc, 0, sizeof(shadowSamplerDesc));
+	shadowSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+	shadowSamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
+	shadowSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+	shadowSamplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+	shadowSamplerDesc.BorderColor[0] = 1.0f;
+	shadowSamplerDesc.BorderColor[1] = 1.0f;
+	shadowSamplerDesc.BorderColor[2] = 1.0f;
+	shadowSamplerDesc.BorderColor[3] = 1.0f;
+	shadowSamplerDesc.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+	shadowSamplerDesc.ComparisonFunc = D3D11_COMPARISON_LESS;
+
+	device->CreateSamplerState(&shadowSamplerDesc, &shadowSamplerState);
+
+
+	//terrain = std::make_shared<Terrain>();
+	//terrain->LoadHeightMap(device,"../../Assets/Textures/terrain.raw" );
 
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
@@ -180,6 +355,20 @@ void Game::Init()
 	CreatePrefilteredMaps();
 
 	CreateEnvironmentLUTs();
+
+	InitializeEntities();
+
+	bulletCounter = 0;
+
+	shipGas = std::make_shared<Emitter>(300, 50, 0.7f, 0.8f, 0.03f, XMFLOAT4(1, 1.0f, 1.0f, 1.0f),
+		XMFLOAT4(1, 0.1f, 0.1f, 0.6f), XMFLOAT3(0, 0, -1.f), XMFLOAT3(0.2f, 0.2f, 0.2f),
+		ship->GetPosition(), XMFLOAT3(0.1f, 0.1f, 0.1f), XMFLOAT4(-2, 2, -2, 2),
+		XMFLOAT3(0.f, -1.f, 0.f), device, particleVS, particlePS, particleTexture);
+
+	shipGas2 = std::make_shared<Emitter>(300, 50, 0.7f, 0.8f, 0.03f, XMFLOAT4(1, 1.0f, 1.0f, 1.0f),
+		XMFLOAT4(1, 0.6f, 0.1f, 0.f), XMFLOAT3(0, 0, -1.f), XMFLOAT3(0.2f, 0.2f, 0.2f),
+		ship->GetPosition(), XMFLOAT3(0.1f, 0.1f, 0.1f), XMFLOAT4(-2, 2, -2, 2),
+		XMFLOAT3(0.f, -1.f, 0.f), device, particleVS, particlePS, particleTexture);
 
 }
 
@@ -221,52 +410,16 @@ void Game::LoadShaders()
 
 	fullScreenTriangleVS = new SimpleVertexShader(device, context);
 	fullScreenTriangleVS->LoadShaderFile(L"FullScreenTriangleVS.cso");
+
+	waterPS = new SimplePixelShader(device, context);
+	waterPS->LoadShaderFile(L"WaterPS.cso");
+
+	particlePS = new SimplePixelShader(device, context);
+	particlePS->LoadShaderFile(L"ParticlesPS.cso");
+
+	particleVS = new SimpleVertexShader(device, context);
+	particleVS->LoadShaderFile(L"ParticlesVS.cso");
 }
-
-
-
-// --------------------------------------------------------
-// Initializes the matrices necessary to represent our geometry's 
-// transformations and our 3D camera
-// --------------------------------------------------------
-void Game::CreateMatrices()
-{
-	// Set up world matrix
-	// - In an actual game, each object will need one of these and they should
-	//    update when/if the object moves (every frame)
-	// - You'll notice a "transpose" happening below, which is redundant for
-	//    an identity matrix.  This is just to show that HLSL expects a different
-	//    matrix (column major vs row major) than the DirectX Math library
-	XMMATRIX W = XMMatrixIdentity();
-	XMStoreFloat4x4(&worldMatrix, XMMatrixTranspose(W)); // Transpose for HLSL!
-
-	// Create the View matrix
-	// - In an actual game, recreate this matrix every time the camera 
-	//    moves (potentially every frame)
-	// - We're using the LOOK TO function, which takes the position of the
-	//    camera and the direction vector along which to look (as well as "up")
-	// - Another option is the LOOK AT function, to look towards a specific
-	//    point in 3D space
-	XMVECTOR pos = XMVectorSet(0, 0, -5, 0);
-	XMVECTOR dir = XMVectorSet(0, 0, 1, 0);
-	XMVECTOR up = XMVectorSet(0, 1, 0, 0);
-	XMMATRIX V = XMMatrixLookToLH(
-		pos,     // The position of the "camera"
-		dir,     // Direction the camera is looking
-		up);     // "Up" direction in 3D space (prevents roll)
-	XMStoreFloat4x4(&viewMatrix, XMMatrixTranspose(V)); // Transpose for HLSL!
-
-	// Create the Projection matrix
-	// - This should match the window's aspect ratio, and also update anytime
-	//    the window resizes (which is already happening in OnResize() below)
-	/*XMMATRIX P = XMMatrixPerspectiveFovLH(
-		0.25f * 3.1415926535f,		// Field of View Angle
-		(float)width / height,		// Aspect ratio
-		0.1f,						// Near clip plane distance
-		100.0f);					// Far clip plane distance
-	XMStoreFloat4x4(&projectionMatrix, XMMatrixTranspose(P)); // Transpose for HLSL!*/
-}
-
 
 // --------------------------------------------------------
 // Creates the geometry we're going to draw - a single triangle for now
@@ -277,33 +430,29 @@ void Game::CreateBasicGeometry()
 	//adding three entities with the meshes
 	entities.reserve(100);
 
-	ID3D11ShaderResourceView* textureSRV;
 	//trying to load a texture
 	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/shipDiffuse.jpg",0,&textureSRV);
 
 	//trying to load a normalMap
-	ID3D11ShaderResourceView* normalTextureSRV;
 	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/shipNormal.jpg", 0, &normalTextureSRV);
 
-	ID3D11ShaderResourceView* roughnessTextureSRV;
 	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/shipRoughness.jpg", 0, &roughnessTextureSRV);
 
-	ID3D11ShaderResourceView* metalnessTextureSRV;
 	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/shipMetallic.jpg", 0, &metalnessTextureSRV);
 
-	ID3D11ShaderResourceView* goldTextureSRV;
 	//trying to load a texture
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredDiffuse.png", 0, &goldTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/BronzeDiffuse.png", 0, &goldTextureSRV);
 
 	//trying to load a normalMap
-	ID3D11ShaderResourceView* goldNormalTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredNormal.png", 0, &goldNormalTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/BronzeNormal.png", 0, &goldNormalTextureSRV);
 
-	ID3D11ShaderResourceView* goldRoughnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredRoughness.png", 0, &goldRoughnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/BronzeRoughness.png", 0, &goldRoughnessTextureSRV);
 
-	ID3D11ShaderResourceView* goldMetalnessTextureSRV;
-	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/LayeredMetallic.png", 0, &goldMetalnessTextureSRV);
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/BronzeMetallic.png", 0, &goldMetalnessTextureSRV);
+
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/waterDiffuse.jpg", 0, &waterDiffuse);
+
+	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/particle.jpg", 0, &particleTexture);
 
 	//loading cel shading
 	CreateWICTextureFromFile(device, context, L"../../Assets/Textures/ColorBand.jpg",0,&celShadingSRV);
@@ -323,47 +472,20 @@ void Game::CreateBasicGeometry()
 	device->CreateSamplerState(&samplerDesc, &samplerState); //creating the sampler state
 	
 	//creating a material for these entities
-	std::shared_ptr<Material> material = std::make_shared<Material>(vertexShader, pbrPixelShader,samplerState,
+
+	//also used for obstacles
+	material = std::make_shared<Material>(vertexShader, pbrPixelShader,samplerState,
 		textureSRV, normalTextureSRV,roughnessTextureSRV,metalnessTextureSRV);
 
 	std::shared_ptr<Material> goldMaterial = std::make_shared<Material>(vertexShader, pbrPixelShader, samplerState,
 		goldTextureSRV, goldNormalTextureSRV, goldRoughnessTextureSRV, goldMetalnessTextureSRV);
 
-	std::shared_ptr<Mesh> ship = std::make_shared<Mesh>("../../Assets/Models/ship.obj",device);
+	waterMat = std::make_shared<Material>(vertexShader,waterPS,samplerState,waterDiffuse);
+
+	shipMesh = std::make_shared<Mesh>("../../Assets/Models/ship.obj",device);
 	std::shared_ptr<Mesh> object = std::make_shared<Mesh>("../../Assets/Models/cube.obj", device);
-	std::shared_ptr<Mesh> sphere = std::make_shared<Mesh>("../../Assets/Models/sphere.obj", device);
-	//std::shared_ptr<Mesh> object = std::make_shared<Mesh>("../../Assets/Models/helix.obj", device);
-
-	entities.emplace_back(std::make_shared<Entity>(ship, material));
-	entities.emplace_back(std::make_shared<Entity>(object, goldMaterial));
-	entities.emplace_back(std::make_shared<Entity>(sphere, goldMaterial));
-
-
-	auto position = entities[1]->GetPosition();
-	entities[1]->SetScale(XMFLOAT3(10, 10, 10));
-	position.x -= 0.f;
-	position.z += 1.f;
-	position.y -= 7.f;
-	entities[1]->SetPosition(position);
-
-	entities[0]->SetScale(XMFLOAT3(0.5f, 0.5f, 0.5f));
-	auto q1 = entities[0]->GetRotation();
-
-	auto q2 = XMQuaternionRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 3.14159f);
-
-	auto tempFinalRot =  XMQuaternionMultiply(XMLoadFloat4(&q1), q2);
-
-	XMStoreFloat4(&q1, tempFinalRot);
-
-	//entities[0]->SetRotation(q1);
-
-	auto spherePos = entities[2]->GetPosition();
-	spherePos.x -= 2;
-	entities[2]->SetPosition(spherePos);
-	
-	//entities[0]->SetScale(XMFLOAT3(10.f, 10.f, 10.f));
-
-	//entities[2]->SetPosition(XMFLOAT3(-2.f, 1.f, 0.f));
+	obstacleMesh = std::make_shared<Mesh>("../../Assets/Models/sphere.obj", device);
+	bulletMesh = std::make_shared<Mesh>("../../Assets/Models/sphere.obj", device);
 
 	ID3D11SamplerState* samplerStateCube;
 	//sampler state description
@@ -378,7 +500,42 @@ void Game::CreateBasicGeometry()
 
 	skybox = std::make_shared<Skybox>();
 	//creating skybox
-	skybox->LoadSkybox(L"../../Assets/Textures/skybox1.dds", device, context,samplerStateCube);
+	skybox->LoadSkybox(L"../../Assets/Textures/SunnyCubeMap.dds", device, context,samplerStateCube);
+
+	D3D11_RASTERIZER_DESC skyRSDesc = {};
+	skyRSDesc.FillMode = D3D11_FILL_SOLID;
+	skyRSDesc.CullMode = D3D11_CULL_FRONT;
+	device->CreateRasterizerState(&skyRSDesc, &skyRS);
+}
+
+void Game::InitializeEntities()
+{
+	ship = std::make_shared<Ship>(shipMesh, material);
+	ship->UseRigidBody();
+	ship->SetTag("Player");
+	entities.emplace_back(ship);
+
+	auto shipOrientation = XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 3.14159f);
+	XMFLOAT4 retShipRotation;
+	XMStoreFloat4(&retShipRotation, shipOrientation);
+	ship->SetRotation(retShipRotation);
+	ship->SetOriginalRotation(retShipRotation);
+
+	for (size_t i = 0; i < MAX_BULLETS; i++)
+	{
+		std::shared_ptr<Bullet> newBullet = std::make_shared<Bullet>(bulletMesh, material);
+		newBullet->UseRigidBody();
+		bullets.emplace_back(newBullet);
+	}
+
+	std::shared_ptr<Mesh> waterMesh = std::make_shared<Mesh>("../../Assets/Models/quad.obj", device);
+	water = std::make_shared<Entity>(waterMesh, waterMat);
+	XMFLOAT3 waterScale = XMFLOAT3(3.f, 3.f, 3.f);
+	water->SetScale(waterScale);
+
+	XMFLOAT3 waterPos = ship->GetPosition();
+	waterPos.y -= 3;
+	water->SetPosition(waterPos);
 
 }
 
@@ -731,6 +888,25 @@ void Game::CreateEnvironmentLUTs()
 	environmentBrdfTexture->Release();
 }
 
+void Game::RestartGame()
+{
+
+	//std::this_thread::sleep_for(std::chrono::seconds(2));
+
+	camera->SetPositionTargetAndUp(XMFLOAT3(0.0f, 3.5f, -18.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+
+	for (size_t i = 0; i < entities.size(); i++)
+	{
+		entities[i] = nullptr;
+	}
+
+	bulletCounter = 0;
+	
+	InitializeEntities();
+
+
+}
+
 
 // --------------------------------------------------------
 // Handle resizing DirectX "stuff" to match the new window size.
@@ -764,6 +940,111 @@ void Game::Update(float deltaTime, float totalTime)
 
 	//updating the camera
 	camera->Update(deltaTime);
+
+	// add obstacles to screen
+	frameCounter += deltaTime;
+
+	if (frameCounter > 3)
+	{
+		XMFLOAT3 position = {
+			(float)(rand() % 31 - 15),
+			(float)(rand() % 11 - 5), // edit this to change y-range
+			ship->GetPosition().z + 30.0f
+		};
+
+		std::shared_ptr<Obstacle> newObstacle = std::make_shared<Obstacle>(obstacleMesh, material);
+
+
+		// set position
+		newObstacle->SetPosition(position);
+		newObstacle->SetScale({ 3, 3, 3 });
+		newObstacle->UseRigidBody();
+
+		obstacles.emplace_back(newObstacle);
+		entities.emplace_back(newObstacle);
+		frameCounter = 0.0f;
+	}
+
+	// handle bullet creation
+ 	if (GetAsyncKeyState(VK_SPACE) & 0x8000 && fired == false)
+	{
+		fired = true;
+		if (bulletCounter<=MAX_BULLETS)
+		{
+			bulletCounter++;
+			std::shared_ptr<Bullet> newBullet = std::make_shared<Bullet>(bulletMesh, material);
+			newBullet->UseRigidBody();
+			XMFLOAT3 bulletPos = ship->GetPosition();
+			bulletPos.y += 0.5f;
+			newBullet->SetPosition(bulletPos);
+			entities.emplace_back(newBullet);
+		}
+	}
+
+	if (GetAsyncKeyState(VK_SPACE) == 0 && fired == true)
+	{
+		fired = false;
+	}
+
+	for (int i = 0; i < entities.size(); i++)
+	{
+		if (entities[i]->GetAliveState())
+		{
+			entities[i]->Update(deltaTime);
+		}
+	}
+
+	shipGas->UpdateParticles(deltaTime,totalTime);
+	auto shipPos = ship->GetPosition();
+	auto shipForward = ship->GetForward();
+	XMFLOAT3 em1Pos;
+	XMStoreFloat3(&em1Pos, XMLoadFloat3(&shipPos) + XMLoadFloat3(&shipForward) * 3);
+	em1Pos.x -= 1.2f;
+	shipGas->SetAcceleration(shipForward);
+	shipGas->SetPosition(em1Pos);
+
+	shipGas2->UpdateParticles(deltaTime,totalTime);
+	shipPos = ship->GetPosition();
+	XMFLOAT3 em2Pos;
+	XMStoreFloat3(&em2Pos, XMLoadFloat3(&shipPos) + XMLoadFloat3(&shipForward) * 3);
+	em2Pos.x += 1.2f;
+	shipGas2->SetPosition(em2Pos);
+
+
+	//checking for collision
+	for (int i = 0; i < entities.size(); i++)
+	{
+		for (int j = 0; j < entities.size(); j++)
+		{
+			entities[i]->IsColliding(entities[j]);
+		}
+	}
+
+	for (int i = 0; i < entities.size(); i++)
+	{
+		if (entities[i]->GetAliveState() == false)
+		{
+			if (entities[i]->GetTag() == "bullet") 
+			{
+				bulletCounter--;
+			}
+
+			if (entities[i]->GetTag() == "Player")
+			{
+				//std::thread t1(&Game::RestartGame,this);
+				//t1.detach();
+				RestartGame();
+				//entities[i] = nullptr;
+				break;
+			}
+
+			entities[i] = nullptr;
+		}
+	}
+
+	entities.erase(std::remove(entities.begin(), entities.end(), nullptr), entities.end());
+
+	lights[1].position.x = (float)sin(deltaTime)*10;
 }
 
 // --------------------------------------------------------
@@ -786,16 +1067,16 @@ void Game::Draw(float deltaTime, float totalTime)
 	context->RSSetViewports(1, &shadowViewport);
 	context->RSSetState(shadowRasterizerState);
 
-	XMFLOAT3 directionLightPosition;
-	XMFLOAT3 center(0.0f, 0.0f, 0.0f);
+	/*XMFLOAT3 directionLightPosition;
+	XMFLOAT3 center(0.0f, 0.0f, 0.0f);*/
 	XMFLOAT3 up(0.0f, 1.0f, 0.0f);
 
 	//taking the center of the camera and backing up from the direction of the light
 	//this is the position of the light
-	XMStoreFloat3(&directionLightPosition, XMLoadFloat3(&center) - XMLoadFloat3(&directionalLight.direction) * 10000.f);
+	//XMStoreFloat3(&directionLightPosition, XMLoadFloat3(&center) - XMLoadFloat3(&directionalLight.direction) * 10000.f);
 	//creating the camera look to matrix
-	auto tempLightView = XMMatrixLookToLH(XMLoadFloat3(&directionLightPosition), 
-		XMLoadFloat3(&directionalLight.direction), XMLoadFloat3(&up));
+	auto tempLightView = XMMatrixLookAtLH(XMLoadFloat3(&lights[0].position), 
+		XMLoadFloat3(&ship->GetPosition()), XMLoadFloat3(&up));
 
 	//storing the light view matrix
 	XMFLOAT4X4 lightView;
@@ -803,8 +1084,8 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	//calculating projection matrix
 	XMFLOAT4X4 lightProjection;
-	XMMATRIX tempLightProjection = XMMatrixOrthographicLH((float)shadowViewport.Width/100.f,(float)shadowViewport.Height/100.f,
-		0.0f,1000000.0f);
+	XMMATRIX tempLightProjection = XMMatrixOrthographicLH(100.f,100.f,
+		0.1f,1000.0f);
 	XMStoreFloat4x4(&lightProjection, XMMatrixTranspose(tempLightProjection));
 
 	shadowVertexShader->SetShader();
@@ -850,6 +1131,9 @@ void Game::Draw(float deltaTime, float totalTime)
 
 		//adding lights and sending camera position
 		entities[i]->GetMaterial()->GetPixelShader()->SetData("light", &directionalLight, sizeof(DirectionalLight)); //adding directional lights to the scene
+		entities[i]->GetMaterial()->GetPixelShader()->SetData("lights", &lights[0], sizeof(Light)*MAX_LIGHTS);
+		entities[i]->GetMaterial()->GetPixelShader()->SetInt("lightCount",2);
+
 		//entities[i]->GetMaterial()->GetPixelShader()->SetData("light2", &directionalLight2, sizeof(DirectionalLight));
 		entities[i]->GetMaterial()->GetPixelShader()->SetFloat3("cameraPosition",camera->GetPosition());
 
@@ -874,7 +1158,6 @@ void Game::Draw(float deltaTime, float totalTime)
 		entities[i]->GetMaterial()->GetPixelShader()->SetShaderResourceView("shadowMap", nullptr);
 	}
 
-	context->OMSetDepthStencilState(dssLessEqual, 0);
 
 	//drawing the terrain
 	/*vertexShader->SetMatrix4x4("world", terrain->GetWorldMatrix());
@@ -885,17 +1168,18 @@ void Game::Draw(float deltaTime, float totalTime)
 	vertexShader->CopyAllBufferData();
 	pixelShader->CopyAllBufferData();
 	vertexShader->SetShader();
-	pixelShader->SetShader();
+	pixelShader->SetShader();*/
 
-	auto tempTerrainVB = terrain->GetVertexBuffer();
+	/*auto tempTerrainVB = terrain->GetVertexBuffer();
 	context->IASetVertexBuffers(0, 1, &tempTerrainVB, &stride, &offset);
 	context->IASetIndexBuffer(terrain->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
 	context->DrawIndexed(511 * 511 * 2*3, 0, 0);*/
 
+	context->OMSetDepthStencilState(dssLessEqual, 0);
+
 	//draw the skybox
+	context->RSSetState(skyRS);
 	skybox->PrepareSkybox(camera->GetViewMatrix(), camera->GetProjectionMatrix(), camera->GetPosition());
-	//skybox->GetPixelShader()->SetShaderResourceView("skyboxTexture", irradienceSRV);
-	//skybox->GetPixelShader()->CopyAllBufferData();
 	auto tempVertexBuffer = skybox->GetVertexBuffer();
 	context->IASetVertexBuffers(0, 1, &tempVertexBuffer, &stride, &offset);
 	context->IASetIndexBuffer(skybox->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
@@ -903,6 +1187,18 @@ void Game::Draw(float deltaTime, float totalTime)
 	context->DrawIndexed(skybox->GetIndexCount(), 0, 0);
 
 	context->OMSetDepthStencilState(NULL, 0);
+
+	//rendering particle
+	float blend[4] = { 1,1,1,1 };
+	context->OMSetBlendState(particleBlendState, blend, 0xffffffff);
+	context->OMSetDepthStencilState(particleDepth, 0);
+
+	particlePS->SetSamplerState("sampleOptions", samplerState);
+	shipGas->Draw(context, camera,totalTime);
+	shipGas2->Draw(context, camera,totalTime);
+
+	context->OMSetDepthStencilState(0, 0);
+	context->OMSetBlendState(0, blend, 0xffffffff);
 
 	// Present the back buffer to the user
 	//  - Puts the final frame we're drawing into the window so the user can see it
@@ -961,12 +1257,15 @@ void Game::OnMouseMove(WPARAM buttonState, int x, int y)
 	//sending the mouse data to the camera
 
 	//how much the mouse has moved since the previous call to this function
-	int deltaX = x - prevMousePos.x;
-	int deltaY = y - prevMousePos.y;
 
-	//changing the yaw and pitch of the camera
-	camera->ChangeYawAndPitch((float)deltaX, (float)deltaY);
+	if (buttonState & 0x0001)
+	{
+		int deltaX = x - prevMousePos.x;
+		int deltaY = y - prevMousePos.y;
 
+		//changing the yaw and pitch of the camera
+		camera->ChangeYawAndPitch((float)deltaX, (float)deltaY);
+	}
 	// Save the previous mouse position, so we have it for the future
 	prevMousePos.x = x;
 	prevMousePos.y = y;

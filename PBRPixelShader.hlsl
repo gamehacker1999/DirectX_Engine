@@ -1,3 +1,4 @@
+#include "Lighting.hlsli"
 
 struct VertexToPixel
 {
@@ -19,25 +20,6 @@ struct DirectionalLight
 	float3 direction;
 };
 
-#define LIGHT_TYPE_DIR 0
-#define LIGHT_TYPE_SPOT 1
-#define LIGHT_TYPE_POINT 2
-
-struct Light
-{
-	int type;
-	float3 direction;
-	float range;
-	float3 position;
-	float intensity;
-	float3 diffuse;
-	float spotFalloff;
-	float3 padding;
-
-};
-
-#define MAX_LIGHTS 128
-
 //constant buffer to hold light data
 cbuffer LightData: register(b0)
 {
@@ -45,7 +27,7 @@ cbuffer LightData: register(b0)
 	DirectionalLight light2;
 	float3 cameraPosition;
 	Light lights[MAX_LIGHTS];
-	uint lightCount;
+	int lightCount;
 };
 
 //textures and basic samplers
@@ -61,76 +43,6 @@ TextureCube prefilteredMap: register(t8);
 SamplerState basicSampler: register(s0);
 SamplerComparisonState shadowSampler: register(s1);
 
-static const float PI = 3.14159265f;
-
-
-//function for the fresnel term(Schlick approximation)
-float3 Fresnel(float3 h, float3 v, float3 f0)
-{
-	//calculating v.h
-	float VdotH = saturate(dot(v, h));
-	//raising it to fifth power
-	float VdotH5 = pow(1 - VdotH, 5);
-
-	float3 finalValue = f0 + (1 - f0) * VdotH5;
-
-	return finalValue;
-}
-
-//fresnel shchlick that takes the roughness into account
-float3 FresnelRoughness(float3 h, float3 v, float3 f0, float roughness)
-{
-	float VdotH = saturate(dot(v, h));
-
-	float VdotH5 = pow(1 - VdotH, 5);
-
-	float3 finalValue = f0 + (max(float3(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), f0) - f0) * VdotH5;
-
-	return finalValue;
-
-}
-
-//function for the Geometric shadowing
-// k is remapped to a / 2 (a is roughness^2)
-// roughness remapped to (r+1)/2
-float GeometricShadowing(
-	float3 n, float3 v, float3 h, float roughness)
-{
-	// End result of remapping:
-	float k = pow(roughness + 1, 2) / 8.0f;
-	float NdotV = saturate(dot(n, v));
-
-	// Final value
-	return NdotV / (NdotV * (1 - k) + k);
-}
-
-
-//function for the GGX normal distribution of microfacets
-float SpecularDistribution(float roughness, float3 h, float3 n)
-{
-	//remapping the roughness
-	float a = pow(roughness, 2);
-	float a2 = a * a;
-
-	float NdotHSquared = saturate(dot(n, h));
-	NdotHSquared *= NdotHSquared;
-
-	float denom = NdotHSquared * (a2 - 1) + 1;
-	denom *= denom;
-	denom *= PI;
-
-	return a2 / denom;
-
-}
-
-//function that calculates the cook torrence brdf
-void CookTorrence(float3 n, float3 h, float roughness, float3 v, float3 f0, float3 l,out float3 F,out float D, out float G)
-{
-	D = SpecularDistribution(roughness,h,n);
-	F = Fresnel(h, v, f0);
-	G = GeometricShadowing(n,v,h,roughness) * GeometricShadowing(n,l,h,roughness);
-
-}
 
 float3 CalculateDiffuse(float3 n, float3 l, float4 diffuseColor, DirectionalLight light)
 {
@@ -260,7 +172,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 N = normalize(input.normal);
 	float3 T = input.tangent - dot(input.tangent, N) * N;
 	T = normalize(T);
-	float3 B = normalize(cross(N, T));
+	float3 B = normalize(cross(T,N));
 
 	float3x3 TBN = float3x3(T, B, N); //getting the tbn matrix
 
@@ -289,22 +201,25 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float3 H = normalize(L+V);
 	float3 R = reflect(-V, N); //reflect R over N
 
-	/*for (uint i = 0; i < lightCount; i++)
-	{
-		float3 Lo = float3(0.0f, 0.0f, 0.0f);
+	float3 Lo = float3(0.0f, 0.0f, 0.0f);
 
+	for (int i = 0; i < lightCount; i++)
+	{
 		switch (lights[i].type)
 		{
-		case LIGHT_TYPE_DIR: Lo += DirectionalLightCalculations(lights[i], N, input.worldPosition); break;
-		case LIGHT_TYPE_SPOT: Lo += SpotLightCalculations(lights[i], N, input.worldPosition); break;
-		case LIGHT_TYPE_POINT: Lo += PointLightCalculations(lights[i], N, input.worldPosition); break;
+		case LIGHT_TYPE_DIR: Lo += DirectLightPBR(lights[i], N, input.worldPosition, cameraPosition, 
+			roughness,	metalColor.r, surfaceColor.xyz,  f0); break;
+		case LIGHT_TYPE_SPOT: Lo += SpotLightPBR(lights[i], N, input.worldPosition, cameraPosition,
+			roughness, metalColor.r, surfaceColor.xyz, f0); break;
+		case LIGHT_TYPE_POINT: Lo += PointLightPBR(lights[i], N, input.worldPosition, cameraPosition,
+			roughness, metalColor.r, surfaceColor.xyz, f0); break;
 		}
-	}*/
+	}
 
 
 	//calulating skybox reflection
 	float3 skyboxReflection = CalculateEnvironmentReflection(finalNormal, input.worldPosition);
-
+	
 	//doing calculations from shadow map to see if it is a shadow or not
 	float lightDepth = input.lightPos.z / input.lightPos.w;
 
@@ -316,32 +231,8 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	//read shadow map for closest surface
 	float shadowDepth = ShadowCalculation(light, shadowUV, lightDepth);
-	//float shadowDepth = shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV, lightDepth);
 
-	float3 Lo = float3(0.0f,0.0f,0.0f);
-
-	//do this calculation for each light
-	float3 F = float3(0.0f,0.0f,0.0f);
-	float D = 0.0f;
-	float G = 0.0f;
-
-	//calculating the diffuse and specular color
-	float3 lambert = CalculateDiffuse(N, L, light.diffuse, light);
-	CookTorrence(N, H, roughness, V, f0, L,F,D,G);
-
-	float3 ks = F; //fresnel is specular term
-	float3 kd = float3(1.0f,1.0f,1.0f) - ks;
-	kd *= (float3(1.0f, 1.0f, 1.0f) - metalColor);
-
-	float3 numSpec = D * F * G;
-	float denomSpec = 4.0f * max(dot(N, V), 0.0f) * max(dot(N, L), 0.0f);
-	float3 specular = numSpec / max(denomSpec, 0.0001f); //just in case denominator is zero
-
-	Lo += ((kd * surfaceColor.xyz / PI) + specular) * lambert;
-
-	float3 ambient = light.ambientColor.xyz * surfaceColor.xyz;
-
-	float3 ksIndirect = FresnelRoughness(N, F, f0,roughness);
+	float3 ksIndirect = FresnelRoughness(dot(N,V), f0,roughness);
 
 	float3 kdIndirect = float3(1.0f, 1.0f, 1.0f) - ksIndirect;
 

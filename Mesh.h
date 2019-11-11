@@ -7,6 +7,9 @@
 #include<vector>
 #include<fstream>
 #include<DirectXMath.h>
+#include<assimp/Importer.hpp>
+#include<assimp/scene.h>
+#include<assimp/postprocess.h>
 
 using namespace DirectX;
 //class to hold the index and vertex data for basic geometry
@@ -17,6 +20,7 @@ class Mesh
 	ID3D11Buffer* indexBuffer;
 
 	unsigned int numIndices; //number of indices in the mesh
+	std::vector<XMFLOAT3> points;
 
 public:
 
@@ -30,8 +34,14 @@ public:
 	ID3D11Buffer* GetVertexBuffer();
 	ID3D11Buffer* GetIndexBuffer();
 	unsigned int GetIndexCount();
+	std::vector<XMFLOAT3> GetPoints();
 
+	//load fbx files
+	void LoadFBX(ID3D11Device* device, std::string& filename);
 	//method to load obj files
-	void LoadOBJ(std::string fileName);
+	void LoadOBJ(ID3D11Device* device,std::string& fileName);
+
+	//function to load draw the mesh
+	void Draw(ID3D11DeviceContext* context);
 };
 

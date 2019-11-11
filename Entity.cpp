@@ -13,8 +13,16 @@ Entity::Entity(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material)
 
 	XMStoreFloat4(&rotation, XMQuaternionIdentity()); //identity quaternion
 
+	body = nullptr;
+
 	//don't need to recalculate matrix now
 	recalculateMatrix = false;
+
+	tag = "default";
+
+	isAlive = true;
+
+	useRigidBody = false;
 }
 
 Entity::~Entity()
@@ -33,6 +41,10 @@ void Entity::SetRotation(XMFLOAT4 rotation)
 	recalculateMatrix = true; //need to recalculate model matrix now
 }
 
+void Entity::SetOriginalRotation(XMFLOAT4 rotation)
+{
+}
+
 void Entity::SetScale(XMFLOAT3 scale)
 {
 	this->scale = scale;
@@ -44,9 +56,56 @@ void Entity::SetModelMatrix(XMFLOAT4X4 matrix)
 	this->modelMatrix = matrix;
 }
 
+void Entity::SetRigidBody(std::shared_ptr<RigidBody> body)
+{
+	this->body = body;
+	useRigidBody = true;
+	XMFLOAT4X4 transpose;
+	XMStoreFloat4x4(&transpose, XMMatrixTranspose(XMLoadFloat4x4(&GetModelMatrix())));
+	this->body->SetModelMatrix(transpose);
+}
+
+std::shared_ptr<RigidBody> Entity::GetRigidBody()
+{
+	XMFLOAT4X4 transpose;
+	XMStoreFloat4x4(&transpose, XMMatrixTranspose(XMLoadFloat4x4(&GetModelMatrix())));
+	body->SetModelMatrix(transpose);
+	return body;
+}
+
+void Entity::UseRigidBody()
+{
+	body = std::make_shared<RigidBody>(mesh->GetPoints());
+	XMFLOAT4X4 transpose;
+	XMStoreFloat4x4(&transpose, XMMatrixTranspose(XMLoadFloat4x4(&GetModelMatrix())));
+	body->SetModelMatrix(transpose);
+	useRigidBody = true;
+}
+
 XMFLOAT3 Entity::GetPosition()
 {
 	return position;
+}
+
+XMFLOAT3 Entity::GetForward()
+{
+	XMFLOAT3 forward;
+	XMStoreFloat3(&forward,XMVector3Rotate(XMVectorSet(0,0,1,0),XMLoadFloat4(&rotation)));
+	return forward;
+}
+
+XMFLOAT3 Entity::GetRight()
+{
+	XMFLOAT3 right;
+	XMStoreFloat3(&right, XMVector3Rotate(XMVectorSet(1, 0, 0, 0), XMLoadFloat4(&rotation)));
+	return right;
+}
+
+XMFLOAT3 Entity::GetUp()
+{
+	XMFLOAT3 up;
+	XMStoreFloat3(&up, XMVector3Rotate(XMVectorSet(0, 1, 0, 0), XMLoadFloat4(&rotation)));
+	return up;
 }
 
 XMFLOAT3 Entity::GetScale()
@@ -81,6 +140,26 @@ XMFLOAT4X4 Entity::GetModelMatrix()
 	return modelMatrix;
 }
 
+void Entity::SetTag(std::string tag)
+{
+	this->tag = tag;
+}
+
+std::string Entity::GetTag()
+{
+	return tag;
+}
+
+void Entity::Die()
+{
+	isAlive = false;
+}
+
+bool Entity::GetAliveState()
+{
+	return isAlive;
+}
+
 std::shared_ptr<Mesh> Entity::GetMesh()
 {
 	return mesh;
@@ -105,4 +184,18 @@ void Entity::PrepareMaterial(XMFLOAT4X4 view, XMFLOAT4X4 projection)
 	//copying data to gpu
 	material->GetVertexShader()->CopyAllBufferData();
 	//material->GetPixelShader()->CopyAllBufferData();
+}
+
+void Entity::Update(float deltaTime)
+{
+
+}
+
+void Entity::GetInput(float deltaTime)
+{
+}
+
+bool Entity::IsColliding(std::shared_ptr<Entity> other)
+{
+	return false;
 }

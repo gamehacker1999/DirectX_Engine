@@ -31,12 +31,16 @@ VertexToPixel main(VertexShaderInput input)
 {
 	VertexToPixel output; //this specifies the data that gets passed along the render pipeline
 
+	matrix viewWithoutTranslate = view;
+	viewWithoutTranslate._41=0;
+	viewWithoutTranslate._42=0;
+	viewWithoutTranslate._43=0;
+
 	//view projection matrix
-	matrix viewProj = mul(view, projection);
+	matrix viewProj = mul(viewWithoutTranslate, projection);
 
 	//calculating the vertex position
 	float4 posWorld = float4(input.position, 1.0);
-	posWorld.xyz += cameraPos;
 
 	//getting the perspective devide to be equal to one
 	output.position = mul(posWorld, viewProj).xyww;

@@ -38,7 +38,7 @@ void Skybox::LoadSkybox(std::wstring fileName, ID3D11Device* device, ID3D11Devic
 
 	this->sampleState = sampleState;
 
-	cube = std::make_shared<Mesh>("../../Assets/Models/skyboxCube.obj",device);
+	cube = std::make_shared<Mesh>("../../Assets/Models/cube.obj",device);
 }
 
 void Skybox::PrepareSkybox(XMFLOAT4X4 view, XMFLOAT4X4 projection,XMFLOAT3 cameraPos)

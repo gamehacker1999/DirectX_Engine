@@ -6,19 +6,21 @@ using namespace DirectX;
 //struct to define a particle
 struct Particle
 {
-	XMFLOAT3 position;
-	XMFLOAT4 color;
-	XMFLOAT3 StartVelocity;
-	float size;
-	float age;
+	float spawnTime;
+	XMFLOAT3 startPosition;
+
+	float rotationStart;
+	XMFLOAT3 startVelocity;
+
+	float rotationEnd;
+	XMFLOAT3 padding;
 };
 
-//single vertex of a particel
+//single vertex of a particle
 //each particle needs four vertcies to make a quad
 struct ParticleVertex 
 {
 	XMFLOAT3 position;
-	XMFLOAT2 texCoord;
+	XMFLOAT2 uv;
 	XMFLOAT4 color;
-	float size;
 };
