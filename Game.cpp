@@ -944,48 +944,6 @@ void Game::Update(float deltaTime, float totalTime)
 	// add obstacles to screen
 	frameCounter += deltaTime;
 
-	if (frameCounter > 3)
-	{
-		XMFLOAT3 position = {
-			(float)(rand() % 31 - 15),
-			(float)(rand() % 11 - 5), // edit this to change y-range
-			ship->GetPosition().z + 30.0f
-		};
-
-		std::shared_ptr<Obstacle> newObstacle = std::make_shared<Obstacle>(obstacleMesh, material);
-
-
-		// set position
-		newObstacle->SetPosition(position);
-		newObstacle->SetScale({ 3, 3, 3 });
-		newObstacle->UseRigidBody();
-
-		obstacles.emplace_back(newObstacle);
-		entities.emplace_back(newObstacle);
-		frameCounter = 0.0f;
-	}
-
-	// handle bullet creation
- 	if (GetAsyncKeyState(VK_SPACE) & 0x8000 && fired == false)
-	{
-		fired = true;
-		if (bulletCounter<=MAX_BULLETS)
-		{
-			bulletCounter++;
-			std::shared_ptr<Bullet> newBullet = std::make_shared<Bullet>(bulletMesh, material);
-			newBullet->UseRigidBody();
-			XMFLOAT3 bulletPos = ship->GetPosition();
-			bulletPos.y += 0.5f;
-			newBullet->SetPosition(bulletPos);
-			entities.emplace_back(newBullet);
-		}
-	}
-
-	if (GetAsyncKeyState(VK_SPACE) == 0 && fired == true)
-	{
-		fired = false;
-	}
-
 	for (int i = 0; i < entities.size(); i++)
 	{
 		if (entities[i]->GetAliveState())
@@ -1020,31 +978,8 @@ void Game::Update(float deltaTime, float totalTime)
 		}
 	}
 
-	for (int i = 0; i < entities.size(); i++)
-	{
-		if (entities[i]->GetAliveState() == false)
-		{
-			if (entities[i]->GetTag() == "bullet") 
-			{
-				bulletCounter--;
-			}
-
-			if (entities[i]->GetTag() == "Player")
-			{
-				//std::thread t1(&Game::RestartGame,this);
-				//t1.detach();
-				RestartGame();
-				//entities[i] = nullptr;
-				break;
-			}
-
-			entities[i] = nullptr;
-		}
-	}
-
 	entities.erase(std::remove(entities.begin(), entities.end(), nullptr), entities.end());
 
-	lights[1].position.x = (float)sin(deltaTime)*10;
 }
 
 // --------------------------------------------------------
