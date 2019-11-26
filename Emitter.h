@@ -37,11 +37,22 @@ public:
 	void SetAcceleration(XMFLOAT3 acel);
 
 	void UpdateParticles(float deltaTime, float currentTime);
-	void Draw(ID3D11DeviceContext* context, std::shared_ptr<Camera> camera,float currentTime);
+	void Draw(ID3D11DeviceContext* context, XMFLOAT4X4 view, XMFLOAT4X4 projection,float currentTime);
+
+	void SetTemporary(float emitterLife);
+	bool IsDead();
+	void Explosive();
+
+private:
 
 	int particlesPerSecond;
 	float secondsPerParticle;
 	float timeSinceEmit;
+	bool isTemp; //is the emitter temporary
+	float emitterLifetime;
+	float emitterAge;
+	bool isDead;
+	bool explosive;
 
 	int livingParticleCount;
 	float lifetime;
@@ -80,10 +91,5 @@ public:
 	// Update Methods
 	void UpdateSingleParticle(float dt, int index, float currentTime);
 	void SpawnParticle(float currentTime);
-
-	// Copy methods
-	void CopyParticlesToGPU(ID3D11DeviceContext* context, std::shared_ptr<Camera> camera);
-	void CopyOneParticle(int index, std::shared_ptr<Camera> camera);
-	XMFLOAT3 CalcParticleVertexPosition(int particleIndex, int quadCornerIndex, std::shared_ptr<Camera> camera);
 };
 

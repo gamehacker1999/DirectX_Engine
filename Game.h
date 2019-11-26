@@ -14,6 +14,7 @@
 #include"Skybox.h"
 #include"Textures.h"
 #include"Terrain.h"
+#include"Water.h"
 #include<thread>
 #include<mutex>
 
@@ -43,11 +44,22 @@ private:
 	// Initialization helper methods - feel free to customize, combine, etc.
 	void LoadShaders(); 
 	void CreateBasicGeometry();
+	void GenerateTerrain();
 	void InitializeEntities();
 	void CreateIrradianceMaps();
 	void CreatePrefilteredMaps();
 	void CreateEnvironmentLUTs();
 	void RestartGame();
+	void DrawSceneOpaque(XMFLOAT4 clip);
+	void DrawSky(XMFLOAT4 clip);
+	void DrawSceneBlend(XMFLOAT4 clip);
+	void DrawParticles(float totalTime, XMFLOAT4 clip);
+	void DrawWaterReflection();
+	void RenderShadowMap();
+	void DrawFullScreenQuad(ID3D11ShaderResourceView* texSRV);
+	void CreateExplosion(XMFLOAT3 pos);
+	void CreateSmoke(XMFLOAT3 shipPos);
+
 
 	// Wrappers for DirectX shaders to provide simplified functionality
 	SimpleVertexShader* vertexShader;
@@ -81,8 +93,6 @@ private:
 	std::shared_ptr<Ship> ship;
 	std::vector<std::shared_ptr<Bullet>> bullets;
 	std::vector<std::shared_ptr<Entity>> entities;
-	std::shared_ptr<Entity> water;
-	std::shared_ptr<Material> waterMat;
 
 	//meshes
 	std::shared_ptr<Mesh> shipMesh;
@@ -152,14 +162,15 @@ private:
 	//simple shader to render a full screen quad
 	SimpleVertexShader* fullScreenTriangleVS;
 
-	//water shader
-	SimplePixelShader* waterPS;
-
 	//1d texture color band
 	ID3D11ShaderResourceView* celShadingSRV;
 
 	//creating blend states
 	ID3D11BlendState* blendState;
+
+	//sampler
+	ID3D11SamplerState* samplerStateCube;
+
 
 	//if bullet has been fired
 	int bulletCounter;
@@ -173,6 +184,10 @@ private:
 	//so i can give the obstacles textures
 	std::shared_ptr<Mesh> sphere;
 	std::shared_ptr<Material> material;
+	std::shared_ptr<Material> obstacleMat;
+
+	//rim lighting shader
+	SimplePixelShader* pbrRimLightingShader;
 
 	//particles
 	SimplePixelShader* particlePS;
@@ -182,6 +197,7 @@ private:
 	ID3D11BlendState* particleBlendState;
 	std::shared_ptr<Emitter> shipGas;
 	std::shared_ptr<Emitter> shipGas2;
+	std::vector<std::shared_ptr<Emitter>> emitterList;
 
 	//textures
 	ID3D11ShaderResourceView* textureSRV;
@@ -204,9 +220,44 @@ private:
 
 	ID3D11ShaderResourceView* goldMetalnessTextureSRV;
 
+	//water textures
+	std::shared_ptr<Water> water;
 	ID3D11ShaderResourceView* waterDiffuse;
+	ID3D11ShaderResourceView* waterNormal1;
+	ID3D11ShaderResourceView* waterNormal2;
+	std::shared_ptr<Mesh> waterMesh;
+	ID3D11SamplerState* waterSampler;
+	SimplePixelShader* waterPS;
+	SimpleVertexShader* waterVS;
+	SimpleVertexShader* waterReflectionVS;
+	SimplePixelShader* waterReflectionPS;
+	ID3D11ShaderResourceView* waterReflectionSRV;
+	ID3D11RenderTargetView* waterReflectionRTV;
+	SimplePixelShader* fullScreenTrianglePS;
+	SimpleComputeShader* h0CS;
+	SimpleComputeShader* htCS;
+	SimpleComputeShader* twiddleFactorsCS;
+	SimpleComputeShader* butterflyCS;
+	SimpleComputeShader* inversionCS;
+	SimpleComputeShader* sobelFilter;
+	SimpleComputeShader* jacobianCS;
+	ID3D11ShaderResourceView* noiseR1;
+	ID3D11ShaderResourceView* noiseI1;
+	ID3D11ShaderResourceView* noiseR2;
+	ID3D11ShaderResourceView* noiseI2;
+	ID3D11ShaderResourceView* foam;
+	ID3D11RasterizerState* wireFrame;
+	bool reflect;
 
-	//loading cel shading
+	//terrain stuff
+	ID3D11ShaderResourceView* terrainTexture1;
+	ID3D11ShaderResourceView* terrainTexture2;
+	ID3D11ShaderResourceView* terrainTexture3;
+	ID3D11ShaderResourceView* terrainNormalTexture1;
+	ID3D11ShaderResourceView* terrainNormalTexture2;
+	ID3D11ShaderResourceView* terrainNormalTexture3;
+	ID3D11ShaderResourceView* terrainBlendMap;
+	SimplePixelShader* terrainPS;
 
 };
 

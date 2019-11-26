@@ -3,6 +3,7 @@ struct VertexToPixel
 {
 	float4 position		: SV_POSITION;
 	float3 worldPos		: TEXCOORD;
+	float clip : SV_ClipDistance0;
 };
 
 //variables for the textures

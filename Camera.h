@@ -44,6 +44,8 @@ public:
 	//getters
 	XMFLOAT3 GetPosition();
 	XMFLOAT3 GetDirection();
+	void SetPosition(XMFLOAT3 pos);
+	void InvertPitch();
 
 	//method to update the camera
 	virtual void Update(float deltaTime);

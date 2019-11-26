@@ -3,7 +3,9 @@
 cbuffer externalData : register(b0)
 {
 	matrix world;
+	matrix reflection;
 	matrix view;
+	float4 clipDistance;
 	matrix projection;
 	matrix lightView;
 	matrix lightProj;
@@ -43,6 +45,8 @@ VertexToPixel main( VertexShaderInput input )
 {
 	// Set up output struct
 	VertexToPixel output;
+
+	matrix finalWorld = mul(world, reflection);
 
 	// First we multiply them together to get a single matrix which represents
 	// all of those transformations (world to view to projection space)

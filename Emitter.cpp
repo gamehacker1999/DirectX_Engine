@@ -38,6 +38,10 @@ Emitter::Emitter(int maxParticles, int particlesPerSecond,
 	//circular buffer indices
 	firstAliveIndex = 0;
 	firstDeadIndex = 0;
+	isDead = false;
+	isTemp = false;
+	emitterAge = true;
+	explosive = false;
 
 	particles = new Particle[maxParticles];//list of particles
 	ZeroMemory(particles, sizeof(Particle) * maxParticles);
@@ -115,6 +119,16 @@ void Emitter::SetAcceleration(XMFLOAT3 acel)
 
 void Emitter::UpdateParticles(float deltaTime, float currentTime)
 {
+
+	if (isTemp)
+	{
+		emitterAge += deltaTime;
+		if (emitterAge >= emitterLifetime)
+		{
+			isDead = true;
+		}
+	}
+
 	if (livingParticleCount > 0)
 	{
 		//looping through the circular buffer
@@ -153,7 +167,7 @@ void Emitter::UpdateParticles(float deltaTime, float currentTime)
 
 }
 
-void Emitter::Draw(ID3D11DeviceContext* context, std::shared_ptr<Camera> camera,float currentTime)
+void Emitter::Draw(ID3D11DeviceContext* context, XMFLOAT4X4 view, XMFLOAT4X4 projection, float currentTime)
 {
 	//mapping the data so that gpu cannot write to it
 	D3D11_MAPPED_SUBRESOURCE mapped = {};
@@ -175,9 +189,8 @@ void Emitter::Draw(ID3D11DeviceContext* context, std::shared_ptr<Camera> camera,
 	context->IASetVertexBuffers(0, 1, &nullBuffer, &stride, &offset);
 
 	//setting the view and projection matrix
-	vs->SetMatrix4x4("view", camera->GetViewMatrix());
-	vs->SetMatrix4x4("projection", camera->GetProjectionMatrix());
-
+	vs->SetMatrix4x4("view", view);
+	vs->SetMatrix4x4("projection", projection);
 	vs->SetFloat3("acceleration", emitterAcceleration);
 	vs->SetFloat4("startColor", startColor);
 	vs->SetFloat4("endColor", endColor);
@@ -213,6 +226,22 @@ void Emitter::Draw(ID3D11DeviceContext* context, std::shared_ptr<Camera> camera,
 		context->DrawIndexed((maxParticles - firstAliveIndex) * 6, 0, 0);
 	}
 
+}
+
+void Emitter::SetTemporary(float emitterLife)
+{
+	isTemp = true;
+	this->emitterLifetime = emitterLife;
+}
+
+bool Emitter::IsDead()
+{
+	return isDead;
+}
+
+void Emitter::Explosive()
+{
+	explosive = true;
 }
 
 void Emitter::UpdateSingleParticle(float dt, int index,float currentTime)

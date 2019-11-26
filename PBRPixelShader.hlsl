@@ -9,6 +9,7 @@ struct VertexToPixel
 	float3 worldPosition: POSITION; //position of vertex in world space
 	float3 tangent		: TANGENT;	//tangent of the vertex
 	float2 uv			: TEXCOORD;
+
 };
 
 //struct to desctibe the directional light
@@ -159,6 +160,7 @@ float ShadowCalculation(DirectionalLight light, float2 shadowUV, float lightDept
 
 float4 main(VertexToPixel input) : SV_TARGET
 {
+	//clip(input.clip);
 	//sampling the diffuse texture
 	float4 surfaceColor = diffuseTexture.Sample(basicSampler,input.uv);
 

@@ -15,6 +15,7 @@ struct VertexToPixel
 {
 	float4 position		: SV_POSITION;
 	float3 worldPos		: TEXCOORD;
+	float clip : SV_ClipDistance0;
 };
 
 //cbuffer for matrix position
@@ -22,6 +23,7 @@ cbuffer externalData: register(b0)
 {
 	matrix world;
 	matrix view;
+	float4 clipDistance;
 	matrix projection;
 	float3 cameraPos;
 }
@@ -44,6 +46,8 @@ VertexToPixel main(VertexShaderInput input)
 
 	//getting the perspective devide to be equal to one
 	output.position = mul(posWorld, viewProj).xyww;
+
+	output.clip = dot(mul(float4(input.position, 1.0f), world), clipDistance);
 
 	//sending the world position to pixelshader
 	output.worldPos = input.position;

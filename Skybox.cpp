@@ -18,8 +18,6 @@ Skybox::~Skybox()
 		indexBuffer->Release();
 	if (textureSRV)
 		textureSRV->Release();
-	if (sampleState)
-		sampleState->Release();
 
 	delete vertexShader;
 	delete pixelShader;

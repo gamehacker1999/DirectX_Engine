@@ -8,7 +8,6 @@ struct VertexToPixel
 	float3 worldPosition: POSITION; //position of vertex in world space
 	float3 tangent		: TANGENT;	//tangent of the vertex
 	float2 uv			: TEXCOORD; //uv coordinates
-	//float4 color		: COLOR;
 };
 
 //struct to desctibe the directional light
