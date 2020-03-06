@@ -63,7 +63,7 @@ float4 CalculateLight(float3 normal, VertexToPixel input)
 
 	//adding diffuse, ambient, and specular color
 	float4 finalLight = float4(dirLight.diffuse,1.0f) * NdotL;
-	finalLight += specularAmount;
+	//finalLight += specularAmount;
 	finalLight += float4(0.4, 0.4, 0.4, 1.0f);
 
 	return finalLight;
@@ -86,14 +86,14 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float2 reflectionTexCoord = float2(input.screenUV.x, -input.screenUV.y);
 	float4 reflectionColor = reflectionTexture.Sample(sampleOptions, reflectionTexCoord);
 
-	float2 scrollUV1 = float2(input.uv.x + scrollX, input.uv.y);
+	float2 scrollUV1 = float2(input.uv.x, input.uv.y);
 	float3 normal1 = normalTexture1.Sample(sampleOptions, scrollUV1).rgb;
 	//unpacking the normal
 	normal1 = (normal1 * 2.0f) - 1.0f;
 
 	//input.normal = normalize(cross(ddx_fine(input.worldPosition), ddy_fine(input.worldPosition)));
 
-	float2 scrollUV2 = float2(input.uv.x, input.uv.y + scrollY);
+	float2 scrollUV2 = float2(input.uv.x, input.uv.y);
 	float3 normal2 = normalTexture2.Sample(sampleOptions, scrollUV2).rgb;
 
 	normal2 = (normal2 * 2.0f) - 1.0f;
@@ -108,6 +108,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float4 foldingColor = foldingMap.Sample(sampleOptions, input.uv);
 
 	//surfaceColor = pow(surfaceColor, 2.2);
+	//surfaceColor += float4(0.2, 0.2, 0.2,0);
 	surfaceColor += saturate((foamColor * foldingColor));
 
 	float3 N = normalize(input.normal);
@@ -120,8 +121,8 @@ float4 main(VertexToPixel input) : SV_TARGET
 	normal3 = mul(normal3, TBN);
 
 	//averaging the two normals
-	//float3 finalNormal = normalize(normal1+normal2);
-	float3 finalNormal = normalize(normal3);
+	float3 finalNormal = normalize(normal1+normal2);
+	finalNormal = normalize(normal3);
 	//surfaceColor = pow(surfaceColor, 2.2);
 
 	//calculating cubemap reflections
@@ -136,8 +137,11 @@ float4 main(VertexToPixel input) : SV_TARGET
 	float4 lightingColor = CalculateLight(finalNormal, input);
 
 	float4 totalColor = surfaceColor * lightingColor;
+
+	//totalColor = pow(totalColor, 1 / 2.2);
+
 	float3 V = normalize(cameraPosition - input.worldPosition); //view vector
 	float4 NdotV = saturate(dot(N, V));
 	//return totalColor;
-	return lerp(reflectionColor,totalColor,0.7);
+	return lerp(reflectionColor,totalColor, 0.7);
 }

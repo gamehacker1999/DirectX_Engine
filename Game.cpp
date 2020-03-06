@@ -520,17 +520,20 @@ void Game::Init()
 
 	bulletCounter = 0;
 
+	auto emmiterPos = ship->GetPosition();
+	emmiterPos.x += 4;
+
 	shipGas = std::make_shared<Emitter>(
-		300, //max particles
-		50, //particles per second
-		0.7f, //lifetime
+		3000, //max particles
+		100, //particles per second
+		2.0f, //lifetime
 		0.8f, //start size
 		0.03f, //end size
 		XMFLOAT4(1, 1.0f, 1.0f, 1.0f), //start color
 		XMFLOAT4(1, 0.1f, 0.1f, 0.6f), //end color
-		XMFLOAT3(0, 0, -1.f), //start vel
+		XMFLOAT3(0, 5, 0.f), //start vel
 		XMFLOAT3(0.2f, 0.2f, 0.2f), //velocity deviation range
-		ship->GetPosition(), //start position
+		emmiterPos, //start position
 		XMFLOAT3(0.1f, 0.1f, 0.1f), //position deviation range
 		XMFLOAT4(-2, 2, -2, 2), //rotation around z axis
 		XMFLOAT3(0.f, -1.f, 0.f), //acceleration
@@ -538,24 +541,6 @@ void Game::Init()
 
 	emitterList.emplace_back(shipGas);
 
-	//look up for what each piece means
-	shipGas2 = std::make_shared<Emitter>(
-		300, 
-		50, 
-		0.7f, 
-		0.8f, 
-		0.03f, 
-		XMFLOAT4(1, 1.0f, 1.0f, 1.0f),
-		XMFLOAT4(1, 0.1f, 0.1f, 0.f), 
-		XMFLOAT3(0, 0, -1.f), 
-		XMFLOAT3(0.2f, 0.2f, 0.2f),
-		ship->GetPosition(), 
-		XMFLOAT3(0.1f, 0.1f, 0.1f), 
-		XMFLOAT4(-2, 2, -2, 2),
-		XMFLOAT3(0.f, -1.f, 0.f), 
-		device, particleVS, particlePS, particleTexture);
-
-	emitterList.emplace_back(shipGas2);
 
 }
 
@@ -772,8 +757,8 @@ void Game::GenerateTerrain()
 		513, //width
 		513, //height
 		TerrainBitDepth::BitDepth_16, //bit depth
-		40.0f, //yscale
-		0.2f, //xz scale
+		20.0f, //yscale
+		0.1f, //xz scale
 		1.0f, //uv scale
 		terrainTexture1,
 		terrainTexture2,
@@ -786,6 +771,9 @@ void Game::GenerateTerrain()
 		vertexShader,
 		terrainPS
 	);
+
+
+	terrain->SetPosition(XMFLOAT3(0, -10, 0));
 }
 
 void Game::InitializeEntities()
@@ -793,6 +781,7 @@ void Game::InitializeEntities()
 	ship = std::make_shared<Ship>(shipMesh, material);
 	ship->UseRigidBody();
 	ship->SetTag("Player");
+	ship->SetPosition(XMFLOAT3(0, 2, 0));
 	entities.emplace_back(ship);
 
 	auto shipOrientation = XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 3.14159f);
@@ -1466,43 +1455,6 @@ void Game::Update(float deltaTime, float totalTime)
 	// add obstacles to screen
 	frameCounter += deltaTime;
 
-	if (frameCounter > 3)
-	{
-		XMFLOAT3 position = {
-			(float)(rand() % 31 - 15),
-			(float)(rand() % 11 - 5), // edit this to change y-range
-			ship->GetPosition().z + 30.0f
-		};
-
-		//std::shared_ptr<Obstacle> newObstacle = std::make_shared<Obstacle>(obstacleMesh, obstacleMat);
-		//
-		//
-		//// set position
-		//newObstacle->SetPosition(position);
-		//newObstacle->SetScale({ 3, 3, 3 });
-		//newObstacle->UseRigidBody();
-		//
-		//obstacles.emplace_back(newObstacle);
-		//entities.emplace_back(newObstacle);
-		frameCounter = 0.0f;
-	}
-
-	// handle bullet creation
- 	if (GetAsyncKeyState(VK_SPACE) & 0x8000 && fired == false)
-	{
-		fired = true;
-		if (bulletCounter<=MAX_BULLETS)
-		{
-			bulletCounter++;
-			std::shared_ptr<Bullet> newBullet = std::make_shared<Bullet>(bulletMesh, material);
-			newBullet->UseRigidBody();
-			XMFLOAT3 bulletPos = ship->GetPosition();
-			bulletPos.y += 0.5f;
-			newBullet->SetPosition(bulletPos);
-			entities.emplace_back(newBullet);
-		}
-	}
-
 	if (GetAsyncKeyState(VK_SPACE) == 0 && fired == true)
 	{
 		fired = false;
@@ -1519,37 +1471,10 @@ void Game::Update(float deltaTime, float totalTime)
 			}
 		}
 	}
-
-	auto shipPos = ship->GetPosition();
-	auto shipForward = ship->GetForward();
-	XMFLOAT3 em1Pos;
-	XMStoreFloat3(&em1Pos, XMLoadFloat3(&shipPos) + XMLoadFloat3(&shipForward) * 3);
-	em1Pos.x -= 1.2f;
-	shipGas->SetAcceleration(shipForward);
-	shipGas->SetPosition(em1Pos);
-
-	shipPos = ship->GetPosition();
-	XMFLOAT3 em2Pos;
-	XMStoreFloat3(&em2Pos, XMLoadFloat3(&shipPos) + XMLoadFloat3(&shipForward) * 3);
-	em2Pos.x += 1.2f;
-	shipGas2->SetAcceleration(shipForward);
-	shipGas2->SetPosition(em2Pos);
-
-	for (int i = 0; i < emitterList.size(); i++)
-	{
-		emitterList[i]->UpdateParticles(deltaTime, totalTime);
-		if (emitterList[i]->IsDead())
-		{
-			emitterList[i] = nullptr;
-		}
-	}
+	
 
 	water->Update(deltaTime, ship->GetPosition());
-	XMFLOAT3 terrainPos = shipPos;
 
-	terrainPos.y = -20.0f;
-	terrainPos.x = -5;
-	terrain->SetPosition(terrainPos);
 
 	//checking for collision
 	for (int i = 0; i < entities.size(); i++)
@@ -1561,38 +1486,10 @@ void Game::Update(float deltaTime, float totalTime)
 	}
 
 
-	for (int i = 0; i < entities.size(); i++)
-	{
-		if (entities[i]->GetAliveState() == false)
-		{
-			if (entities[i]->GetTag() == "bullet") 
-			{
-				bulletCounter--;
-			}
-
-			if (entities[i]->GetTag() == "Player")
-			{
-				//std::thread t1(&Game::RestartGame,this);
-				//t1.detach();
-				RestartGame();
-				//entities[i] = nullptr;
-				break;
-			}
-
-			if (entities[i]->GetTag() == "Obstacle")
-			{
-				CreateExplosion(entities[i]->GetPosition());
-			}
-
-			entities[i] = nullptr;
-		}
-	}
 
 	entities.erase(std::remove(entities.begin(), entities.end(), nullptr), entities.end());
 	emitterList.erase(std::remove(emitterList.begin(), emitterList.end(), nullptr), emitterList.end());
 
-
-	lights[1].position.x = (float)sin(deltaTime)*10;
 }
 
 // --------------------------------------------------------
@@ -1657,6 +1554,8 @@ void Game::Draw(float deltaTime, float totalTime)
 	
 	clip = XMFLOAT4(0, 0, 0, 0);
 	DrawSceneOpaque(clip);
+	//terrain->Draw(camera->GetViewMatrix(), camera->GetProjectionMatrix(),
+		//context, lights[0]);
 
 	//drawing the water
 	waterPS->SetShaderResourceView("reflectionTexture", waterReflectionSRV);
@@ -1669,8 +1568,7 @@ void Game::Draw(float deltaTime, float totalTime)
 
 	DrawParticles(totalTime,clip);
 
-	//terrain->Draw(camera->GetViewMatrix(), camera->GetProjectionMatrix(),
-		//context, lights[0]);
+
 
 	ID3D11ShaderResourceView* nullSRV[16] = {};
 	context->PSSetShaderResources(0, 16, nullSRV);

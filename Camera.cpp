@@ -131,7 +131,7 @@ void Camera::ManageKeyboard(float deltaTime)
 		XMFLOAT3 worldUp(0.0f, 1.0f, 0.0f);
 		XMVECTOR right = XMVector3Cross(XMLoadFloat3(&worldUp), XMLoadFloat3(&direction)); //finding the right vector
 		XMStoreFloat3(&up, XMVector3Cross(XMLoadFloat3(&direction), right));
-		XMVECTOR tempPosition = XMLoadFloat3(&position) - XMLoadFloat3(&worldUp) * deltaTime;//moving the camera forward
+		XMVECTOR tempPosition = XMLoadFloat3(&position) - XMLoadFloat3(&worldUp) * deltaTime*10;//moving the camera forward
 		XMStoreFloat3(&position, tempPosition);// storing the position
 	}
 
@@ -141,7 +141,7 @@ void Camera::ManageKeyboard(float deltaTime)
 		XMFLOAT3 worldUp(0.0f, 1.0f, 0.0f);
 		XMVECTOR right = XMVector3Cross(XMLoadFloat3(&worldUp), XMLoadFloat3(&direction)); //finding the right vector
 		XMStoreFloat3(&up, XMVector3Cross(XMLoadFloat3(&direction), right));
-		XMVECTOR tempPosition = XMLoadFloat3(&position) + XMLoadFloat3(&worldUp) * deltaTime;//moving the camera forward
+		XMVECTOR tempPosition = XMLoadFloat3(&position) + XMLoadFloat3(&worldUp) * deltaTime*10;//moving the camera forward
 		XMStoreFloat3(&position, tempPosition);// storing the position
 	}
 }

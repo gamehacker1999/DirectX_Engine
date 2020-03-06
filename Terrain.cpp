@@ -119,27 +119,6 @@ Terrain::Terrain(
 			int normalCount = 0;
 			XMVECTOR normalTotal = XMVectorSet(0, 0, 0, 0);
 
-			// Normals
-			//XMVECTOR upLeft = XMLoadFloat3(&triangleNormals[triIndexPrevRow - 1]);
-			//XMVECTOR up = XMLoadFloat3(&triangleNormals[triIndexPrevRow]);
-			//XMVECTOR upRight = XMLoadFloat3(&triangleNormals[triIndexPrevRow + 1]);
-			//XMVECTOR downLeft = XMLoadFloat3(&triangleNormals[triIndex - 1]);
-			//XMVECTOR down = XMLoadFloat3(&triangleNormals[triIndex]);
-			//XMVECTOR downRight = XMLoadFloat3(&triangleNormals[triIndex + 1]);
-
-			// x-----x-----x
-			// |\    |\    |  
-			// | \ u | \   |  
-			// |  \  |  \  |  ul = up left
-			// |   \ |   \ |  u  = up
-			// | ul \| ur \|  ur = up right
-			// x-----O-----x
-			// |\ dl |\ dr |  dl = down left
-			// | \   | \   |  d  = down
-			// |  \  |  \  |  dr = down right
-			// |   \ | d \ |
-			// |    \|    \|
-			// x-----x-----x
 
 			// If not top row and not first column
 			if (z > 0 && x > 0)
@@ -349,7 +328,7 @@ void Terrain::CreateTangents(Vertex* vertices, int numVerts, unsigned int* indic
 		float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
 		//calculating the tangent of the triangle
 		XMFLOAT3 tangent;
-		XMStoreFloat3(&tangent, (XMLoadFloat3(&edge1) * deltaUV2.y - XMLoadFloat3(&edge2) * deltaUV1.y) * r);
+		XMStoreFloat3(&tangent, -(XMLoadFloat3(&edge1) * deltaUV2.y - XMLoadFloat3(&edge2) * deltaUV1.y) * r);
 
 		vertices[i].tangent = tangent;
 		vertices[i + 1].tangent = tangent;
