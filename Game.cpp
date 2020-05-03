@@ -533,13 +533,48 @@ void Game::Init()
 		XMFLOAT4(1, 0.1f, 0.1f, 0.6f), //end color
 		XMFLOAT3(0, 5, 0.f), //start vel
 		XMFLOAT3(0.2f, 0.2f, 0.2f), //velocity deviation range
-		emmiterPos, //start position
+		XMFLOAT3(0,0,0), //start position
 		XMFLOAT3(0.1f, 0.1f, 0.1f), //position deviation range
 		XMFLOAT4(-2, 2, -2, 2), //rotation around z axis
 		XMFLOAT3(0.f, -1.f, 0.f), //acceleration
 		device, particleVS, particlePS, particleTexture);
 
-	emitterList.emplace_back(shipGas);
+	auto emitter = std::make_shared<Emitter>(
+		1000, //max particles
+		100, //particles per second
+		2.0f, //lifetime
+		0.8f, //start size
+		0.03f, //end size
+		XMFLOAT4(1, 1.0f, 1.0f, 1.0f), //start color
+		XMFLOAT4(1, 0.1f, 0.1f, 0.6f), //end color
+		XMFLOAT3(0, 5, 0.f), //start vel
+		XMFLOAT3(0.2f, 0.2f, 0.2f), //velocity deviatio
+		XMFLOAT3(0, 0, 0), //start position
+		XMFLOAT3(0.1f, 0.1f, 0.1f), //position deviatio
+		XMFLOAT4(-2, 2, -2, 2), //rotation around z axi
+		XMFLOAT3(0.f, 1.f, 0.f), //acceleration
+		device, particleVS, particlePS, particleTexture
+		);
+
+	auto emitter2 = std::make_shared<Emitter>(
+		1000, //max particles
+		50, //particles per second
+		2.0f, //lifetime
+		0.03f, //start size
+		1.f, //end size
+		XMFLOAT4(1, 0.0f, 0.0f, 1.0f), //start color
+		XMFLOAT4(0, 0.1f, 1.0f, 0.6f), //end color
+		XMFLOAT3(3, 3, 0.f), //start vel
+		XMFLOAT3(0.2f, 0.2f, 0.2f), //velocity deviatio
+		XMFLOAT3(4, 0, 0), //start position
+		XMFLOAT3(0.1f, 0.1f, 0.1f), //position deviatio
+		XMFLOAT4(-2, 2, -2, 2), //rotation around z axi
+		XMFLOAT3(0.f, -2.f, 0.f), //acceleration
+		device, particleVS, particlePS, particleTexture
+		);
+	emitterList.emplace_back(emitter);
+	emitterList.emplace_back(emitter2);
+
 
 
 }
@@ -715,7 +750,7 @@ void Game::CreateBasicGeometry()
 	std::shared_ptr<Material> goldMaterial = std::make_shared<Material>(vertexShader, pbrPixelShader, samplerState,
 		goldTextureSRV, goldNormalTextureSRV, goldRoughnessTextureSRV, goldMetalnessTextureSRV);
 
-	obstacleMat = std::make_shared<Material>(vertexShader, pbrRimLightingShader, samplerState,
+	obstacleMat = std::make_shared<Material>(vertexShader, pbrPixelShader, samplerState,
 		goldTextureSRV, goldNormalTextureSRV, goldRoughnessTextureSRV, goldMetalnessTextureSRV);
 
 	shipMesh = std::make_shared<Mesh>("../../Assets/Models/ship.obj",device);
@@ -773,7 +808,7 @@ void Game::GenerateTerrain()
 	);
 
 
-	terrain->SetPosition(XMFLOAT3(0, -10, 0));
+	terrain->SetPosition(XMFLOAT3(100, -70, 0));
 }
 
 void Game::InitializeEntities()
@@ -781,8 +816,10 @@ void Game::InitializeEntities()
 	ship = std::make_shared<Ship>(shipMesh, material);
 	ship->UseRigidBody();
 	ship->SetTag("Player");
-	ship->SetPosition(XMFLOAT3(0, 2, 0));
+	ship->SetPosition(XMFLOAT3(-50, 2, 0));
 	entities.emplace_back(ship);
+	//entities.emplace_back(std::make_shared<Entity>(bulletMesh, obstacleMat));
+	//entities[1]->SetPosition(XMFLOAT3(0,0,0));
 
 	auto shipOrientation = XMQuaternionRotationAxis(XMVectorSet(0, 1, 0, 0), 3.14159f);
 	XMFLOAT4 retShipRotation;
@@ -807,6 +844,8 @@ void Game::InitializeEntities()
 	water->CreateH0Texture();
 
 	water->CreateTwiddleIndices();
+
+	
 }
 
 void Game::CreateIrradianceMaps()
@@ -1378,7 +1417,7 @@ void Game::CreateExplosion(XMFLOAT3 pos)
 {
 	std::shared_ptr<Emitter> explosion = std::make_shared<Emitter>(
 		1000, //max particles
-		1000, //particles per second
+		100, //particles per second
 		0.7f, //lifetime
 		0.03f, //start size
 		1.0f, //end size
@@ -1484,7 +1523,11 @@ void Game::Update(float deltaTime, float totalTime)
 			entities[i]->IsColliding(entities[j]);
 		}
 	}
-
+	
+	for (int i = 0; i < emitterList.size(); i++)
+	{
+		emitterList[i]->UpdateParticles(deltaTime, totalTime);
+	}
 
 
 	entities.erase(std::remove(entities.begin(), entities.end(), nullptr), entities.end());
@@ -1554,8 +1597,8 @@ void Game::Draw(float deltaTime, float totalTime)
 	
 	clip = XMFLOAT4(0, 0, 0, 0);
 	DrawSceneOpaque(clip);
-	//terrain->Draw(camera->GetViewMatrix(), camera->GetProjectionMatrix(),
-		//context, lights[0]);
+	terrain->Draw(camera->GetViewMatrix(), camera->GetProjectionMatrix(),
+		context, lights[0]);
 
 	//drawing the water
 	waterPS->SetShaderResourceView("reflectionTexture", waterReflectionSRV);

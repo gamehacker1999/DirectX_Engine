@@ -189,6 +189,8 @@ XMFLOAT4X4 Terrain::GetWorldMatrix()
 	if (recalculateMatrix)
 	{
 		//getting the translation, scale, and rotation matrices
+		position.x = 100;
+		position.y = 0;
 		XMMATRIX translate = XMMatrixTranslationFromVector(XMLoadFloat3(&position));
 
 		//calculating the model matrix from these three matrices and storing it
@@ -346,6 +348,7 @@ void Terrain::Draw(XMFLOAT4X4 view, XMFLOAT4X4 projection, ID3D11DeviceContext* 
 	vertexShader->SetMatrix4x4("view", view);
 	vertexShader->SetMatrix4x4("projection", projection);
 	vertexShader->SetFloat4("clipDistance", XMFLOAT4(0, 0, 0, 0));
+	
 
 	vertexShader->CopyAllBufferData();
 	vertexShader->SetShader();

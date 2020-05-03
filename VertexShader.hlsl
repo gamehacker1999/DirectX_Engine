@@ -3,10 +3,13 @@
 cbuffer externalData : register(b0)
 {
 	matrix world;
-	matrix reflection;
 	matrix view;
-	float4 clipDistance;
 	matrix projection;
+};
+
+cbuffer lightData : register(b1)
+{
+	float4 clipDistance;
 	matrix lightView;
 	matrix lightProj;
 };

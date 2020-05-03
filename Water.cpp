@@ -465,7 +465,7 @@ Water::~Water()
 void Water::Update(float deltaTime,XMFLOAT3 shipPos)
 {
 	//setting the world matrix for water
-	XMFLOAT3 curPos = XMFLOAT3(0,0,0);
+	XMFLOAT3 curPos = XMFLOAT3(50,0,0);
 	curPos.y = -2;
 	//curPos.z += 60;
 	//curPos.x = 0;
@@ -481,7 +481,7 @@ void Water::Draw(Light lights, ID3D11ShaderResourceView* cubeMap, std::shared_pt
 	ID3D11DeviceContext* context, float deltaTime, float totalTime, ID3D11SamplerState* waterSampler)
 {
 
-	RenderFFT(totalTime);
+	RenderFFT(totalTime*1.4);
 
 	//static float totalTime = 0;
 	//totalTime += deltaTime;
