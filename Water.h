@@ -25,6 +25,8 @@ class Water
 
 	SimplePixelShader* waterPS;
 	SimpleVertexShader* waterVS;
+	SimpleHullShader* waterHS;
+	SimpleDomainShader* waterDS;
 	ID3D11SamplerState* samplerState;
 
 	XMFLOAT4X4 worldMat;
@@ -84,7 +86,7 @@ class Water
 public:
 	Water(std::shared_ptr<Mesh> waterMesh, ID3D11ShaderResourceView* waterTex,
 		ID3D11ShaderResourceView* waterNormal1, ID3D11ShaderResourceView* waterNormal2,
-		SimplePixelShader* waterPS, SimpleVertexShader* waterVS, 
+		SimplePixelShader* waterPS, SimpleVertexShader* waterVS, SimpleHullShader* waterHS,SimpleDomainShader* waterDS,
 		SimpleComputeShader* h0CS, SimpleComputeShader* htCS, SimpleComputeShader* twiddleFactorsCS,
 		SimpleComputeShader* butterflyCS, SimpleComputeShader* inversionCS, SimpleComputeShader* sobelFilter,
 		SimpleComputeShader* jacobianCS,ID3D11SamplerState* samplerState,

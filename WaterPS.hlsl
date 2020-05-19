@@ -142,6 +142,6 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	float3 V = normalize(cameraPosition - input.worldPosition); //view vector
 	float4 NdotV = saturate(dot(N, V));
-	//return totalColor;
-	return lerp(reflectionColor,totalColor, 0.7);
+	return totalColor;
+	//return lerp(reflectionColor,totalColor, 0.7);
 }

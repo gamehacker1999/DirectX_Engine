@@ -2,7 +2,7 @@
 
 Water::Water(std::shared_ptr<Mesh> waterMesh, ID3D11ShaderResourceView* waterTex,
 	ID3D11ShaderResourceView* waterNormal1, ID3D11ShaderResourceView* waterNormal2,
-	SimplePixelShader* waterPS, SimpleVertexShader* waterVS,
+	SimplePixelShader* waterPS, SimpleVertexShader* waterVS, SimpleHullShader* waterHS, SimpleDomainShader* waterDS,
 	SimpleComputeShader* h0CS, SimpleComputeShader* htCS, SimpleComputeShader* twiddleFactorsCS,
 	SimpleComputeShader* butterflyCS, SimpleComputeShader* inversionCS, SimpleComputeShader* sobelFilter,
 	SimpleComputeShader* jacobianCS, ID3D11SamplerState* samplerState,
@@ -15,6 +15,8 @@ Water::Water(std::shared_ptr<Mesh> waterMesh, ID3D11ShaderResourceView* waterTex
 	this->waterNormal2 = waterNormal2;
 	this->waterPS = waterPS;
 	this->waterVS = waterVS;
+	this->waterHS = waterHS;
+	this->waterDS = waterDS;
 	this->samplerState = samplerState;
 	this->noiseR1 = noiseR1;
 	this->noiseI1 = noiseI1;
@@ -469,7 +471,7 @@ void Water::Update(float deltaTime,XMFLOAT3 shipPos)
 	curPos.y = -2;
 	//curPos.z += 60;
 	//curPos.x = 0;
-	XMFLOAT3 scale = XMFLOAT3(2.f, 2.f, 2.f);
+	XMFLOAT3 scale = XMFLOAT3(300.f, 300.f, 300.f);
 	XMMATRIX matTrans = XMMatrixTranslationFromVector(XMLoadFloat3(&curPos));
 	XMMATRIX matScale = XMMatrixScalingFromVector(XMLoadFloat3(&scale));
 	XMMATRIX rot = XMMatrixRotationQuaternion(XMQuaternionIdentity());
@@ -481,7 +483,7 @@ void Water::Draw(Light lights, ID3D11ShaderResourceView* cubeMap, std::shared_pt
 	ID3D11DeviceContext* context, float deltaTime, float totalTime, ID3D11SamplerState* waterSampler)
 {
 
-	RenderFFT(totalTime*1.4);
+	RenderFFT(totalTime);
 
 	//static float totalTime = 0;
 	//totalTime += deltaTime;
@@ -528,13 +530,32 @@ void Water::Draw(Light lights, ID3D11ShaderResourceView* cubeMap, std::shared_pt
 	waterPS->CopyAllBufferData();
 	waterPS->SetShader();
 
+	waterHS->SetShader();
+
+	waterDS->SetMatrix4x4("view", camera->GetViewMatrix());
+	waterDS->SetMatrix4x4("projection", camera->GetProjectionMatrix());
+	waterDS->SetMatrix4x4("world", worldMat);
+	waterDS->SetFloat3("cameraPos", camera->GetPosition());
+
+	waterDS->SetShaderResourceView("heightMap", dySRV);
+	waterDS->SetShaderResourceView("heightMapX", dxSRV);
+	waterDS->SetShaderResourceView("heightMapZ", dzSRV);
+	waterDS->SetSamplerState("sampleOptions", samplerState);
+	waterDS->CopyAllBufferData();
+	waterDS->SetShader();
+
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
 	auto tempVertBuffer = waterMesh->GetVertexBuffer();
 	context->IASetVertexBuffers(0, 1, &tempVertBuffer, &stride, &offset);
 	context->IASetIndexBuffer(waterMesh->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
 
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
 	context->DrawIndexed(waterMesh->GetIndexCount(), 0, 0);
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	context->HSSetShader(nullptr, 0, 0);
+	context->DSSetShader(nullptr, 0, 0);
+
 }
 
 void Water::CreateH0Texture()

@@ -60,6 +60,8 @@ Game::Game(HINSTANCE hInstance)
 	waterNormal2 = nullptr;
 	waterPS = nullptr;
 	waterVS = nullptr;
+	waterHS = nullptr;
+	waterDS = nullptr;
 	waterReflectionRTV = nullptr;
 	waterReflectionSRV = nullptr;
 	waterReflectionPS = nullptr;
@@ -192,6 +194,11 @@ Game::~Game()
 
 	if (waterVS)
 		delete waterVS;
+
+	if (waterHS)
+		delete waterHS;
+	if (waterDS)
+		delete waterDS;
 
 	samplerStateCube->Release();
 
@@ -624,6 +631,12 @@ void Game::LoadShaders()
 	waterVS = new SimpleVertexShader(device, context);
 	waterVS->LoadShaderFile(L"WaterVS.cso");
 
+	waterHS = new SimpleHullShader(device, context);
+	waterHS->LoadShaderFile(L"WaterHS.cso");
+
+	waterDS = new SimpleDomainShader(device, context);
+	waterDS->LoadShaderFile(L"WaterDS.cso");
+
 	particlePS = new SimplePixelShader(device, context);
 	particlePS->LoadShaderFile(L"ParticlesPS.cso");
 
@@ -837,7 +850,9 @@ void Game::InitializeEntities()
 	water = std::make_shared<Water>(waterMesh, 
 		waterDiffuse, 
 		waterNormal1, waterNormal2, 
-		waterPS, waterVS,h0CS, htCS, twiddleFactorsCS, butterflyCS, inversionCS, sobelFilter, jacobianCS,
+		waterPS, waterVS, waterHS, waterDS, h0CS, htCS,
+		twiddleFactorsCS, butterflyCS,
+		inversionCS, sobelFilter, jacobianCS,
 		samplerState,device,
 		noiseR1,noiseI1,noiseR2,noiseI2);
 

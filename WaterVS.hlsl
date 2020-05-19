@@ -36,6 +36,19 @@ struct VertexShaderInput
 	float2 uv			: TEXCOORD;		//Texture coordinates
 };
 
+struct HullShaderInput
+{
+	float4 position		: WORLDPOS;	// XYZW position (System Value Position)
+	float4 lightPos		: TEXCOORD1;
+	float3 normal		: NORMAL;		//normal of the vertex
+	float3 worldPosition: POSITION; //position of vertex in world space
+	float3 tangent		: TANGENT;	//tangent of the vertex
+	float2 uv			: TEXCOORD;
+	float2 motion		: TEXCOORD2;
+	float2 heightUV		: TEXCOORD3;
+	noperspective float2 screenUV		: VPOS;
+};
+
 // Struct representing the data we're sending down the pipeline
 struct VertexToPixel
 {
@@ -97,10 +110,10 @@ static const float3 off = { -1.0,0.0,1.0 };
 // - Output is a single struct of data to pass down the pipeline
 // - Named "main" because that's the default the shader compiler looks for
 // --------------------------------------------------------
-VertexToPixel main(VertexShaderInput input)
+HullShaderInput main(VertexShaderInput input)
 {
 	// Set up output struct
-	VertexToPixel output;
+	HullShaderInput output;
 
 	// First we multiply them together to get a single matrix which represents
 	// all of those transformations (world to view to projection space)
@@ -143,12 +156,12 @@ VertexToPixel main(VertexShaderInput input)
 	//float3 normal = float3(hR-hL, 2, hU-hD);
 	//input.normal = normalize(normal);
 
-	float3 pos = input.position;
-	pos.y = height;
-	pos.z -= heightZ;
-	pos.x -= heightX;
+	//float3 pos = input.position;
+	//pos.y = height;
+	//pos.z -= heightZ;
+	//pos.x -= heightX;
 
-	input.position = pos;
+	//input.position = pos;
 	//float3 tangent = float3(1.0f, 0, 0);
 	//float3 binormal = float3(0.0f, 0, 1.0f);
 	//pos += GerstnerWave(waveA,input.position,tangent,binormal,dt);
@@ -161,7 +174,7 @@ VertexToPixel main(VertexShaderInput input)
 
 	// The result is essentially the position (XY) of the vertex on our 2D 
 	// screen and the distance (Z) from the camera (the "depth" of the pixel)
-	output.position = mul(float4(input.position, 1.0f), worldViewProj);
+	output.position = mul(float4(input.position,1.0f),world);//mul(float4(input.position, 1.0f), worldViewProj);
 
 	//applying the normal by removing the translation from it
 	output.normal = mul(input.normal, (float3x3)world);

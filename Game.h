@@ -241,6 +241,8 @@ private:
 	SimpleComputeShader* inversionCS;
 	SimpleComputeShader* sobelFilter;
 	SimpleComputeShader* jacobianCS;
+	SimpleHullShader* waterHS;
+	SimpleDomainShader* waterDS;
 	ID3D11ShaderResourceView* noiseR1;
 	ID3D11ShaderResourceView* noiseI1;
 	ID3D11ShaderResourceView* noiseR2;
