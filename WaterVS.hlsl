@@ -38,10 +38,10 @@ struct VertexShaderInput
 
 struct HullShaderInput
 {
-	float4 position		: WORLDPOS;	// XYZW position (System Value Position)
+	float3 position		: POSITION;	// XYZW position (System Value Position)
 	float4 lightPos		: TEXCOORD1;
 	float3 normal		: NORMAL;		//normal of the vertex
-	float3 worldPosition: POSITION; //position of vertex in world space
+	float3 worldPosition: POSITION1; //position of vertex in world space
 	float3 tangent		: TANGENT;	//tangent of the vertex
 	float2 uv			: TEXCOORD;
 	float2 motion		: TEXCOORD2;
@@ -174,7 +174,7 @@ HullShaderInput main(VertexShaderInput input)
 
 	// The result is essentially the position (XY) of the vertex on our 2D 
 	// screen and the distance (Z) from the camera (the "depth" of the pixel)
-	output.position = mul(float4(input.position,1.0f),world);//mul(float4(input.position, 1.0f), worldViewProj);
+	output.position = input.position;//mul(float4(input.position, 1.0f), worldViewProj);
 
 	//applying the normal by removing the translation from it
 	output.normal = mul(input.normal, (float3x3)world);
@@ -190,10 +190,6 @@ HullShaderInput main(VertexShaderInput input)
 	output.uv = input.uv;
 
 	matrix lightWorldViewProj = mul(mul(world, lightView), lightProj);
-
-	output.screenUV = output.position.xy / output.position.w;
-	output.screenUV.x = output.screenUV.x * 0.5 + 0.5;
-	output.screenUV.y = -output.screenUV.y * 0.5 + 0.5;
 
 	//sending the the shadow position
 	output.lightPos = mul(float4(input.position, 1.0f), lightWorldViewProj);

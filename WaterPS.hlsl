@@ -104,7 +104,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	float4 surfaceColor = waterTexture.Sample(sampleOptions, input.uv);
 
-	float4 foamColor = foam.Sample(sampleOptions, input.uv*15);
+	float4 foamColor = foam.Sample(sampleOptions, input.uv*10);
 	float4 foldingColor = foldingMap.Sample(sampleOptions, input.uv);
 
 	//surfaceColor = pow(surfaceColor, 2.2);

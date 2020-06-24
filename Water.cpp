@@ -483,7 +483,7 @@ void Water::Draw(Light lights, ID3D11ShaderResourceView* cubeMap, std::shared_pt
 	ID3D11DeviceContext* context, float deltaTime, float totalTime, ID3D11SamplerState* waterSampler)
 {
 
-	RenderFFT(totalTime);
+	RenderFFT(totalTime*1.4);
 
 	//static float totalTime = 0;
 	//totalTime += deltaTime;
@@ -530,6 +530,9 @@ void Water::Draw(Light lights, ID3D11ShaderResourceView* cubeMap, std::shared_pt
 	waterPS->CopyAllBufferData();
 	waterPS->SetShader();
 
+	waterHS->SetFloat3("cameraPos", camera->GetPosition());
+	waterHS->SetMatrix4x4("world", worldMat);
+	waterHS->CopyAllBufferData();
 	waterHS->SetShader();
 
 	waterDS->SetMatrix4x4("view", camera->GetViewMatrix());
